@@ -1,7 +1,16 @@
 todo:
++ refactor to match jmock apis more closely (Invokable, Matcher, Stub)
++ default stub behaviour
++ TestCase base class for autoverification of mocks in test case.
++ change error messages to be more similar to the jmock style (unexpected call -> all mockers with state, failed verification -> verification error)
++ change to python license
++ PyPI registration 
++ constrain allowable order of builder methods
 + add constraints and(), not(), or()
-+ support for python properties
-+ docs, examples, web page
++ rename label method back to id
++ build scripts in CVS (Scons?)
 
-possibilities:
-+ alternative to LIFO expectation matcher, search most constrained first
+possibly:
++ constraint base class to allow non-derived constraints to default to an equality match against the parameter. Would allow more compact argument constraints for the common case of equality e.g. mock.foo('bar').will(...)
++ pull out dispatcher functionality to allow different matching strategies (LIFO, FIFO)?
++ support for properties
