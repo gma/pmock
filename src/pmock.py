@@ -91,20 +91,20 @@ class VerificationError(Error):
 class MatchError(Error):
     """Method call unexpected or conflicts with expectations."""
     
-    def create_conflict_error(cls, call, mocker):
+    def create_conflict_error(cls, invocation, mocker):
         msg = ("call %s, conflicts with expectation: %s" %
-               (call, mocker.matchers_str()))
+               (invocation, mocker.matchers_str()))
         return MatchError(msg)
 
     create_conflict_error = classmethod(create_conflict_error)
 
-    def create_unexpected_error(cls, call, unsatisfied_mockers):
+    def create_unexpected_error(cls, invocation, unsatisfied_mockers):
         if len(unsatisfied_mockers) > 0:
             err_msg = ("unexpected call %s, expectation(s): %s" %
-                       (call, cls._mockers_str(unsatisfied_mockers)))
+                       (invocation, cls._mockers_str(unsatisfied_mockers)))
         else:
             err_msg = ("unexpected call %s, no expectations remaining" %
-                       call)
+                       invocation)
         return MatchError(err_msg)
 
     create_unexpected_error = classmethod(create_unexpected_error)
@@ -147,22 +147,22 @@ class AbstractArgumentsMatcher(object):
                 arg_strs.append("%s=%s" % (kw, str(constraint)))
             return ", ".join(arg_strs)
 
-    def _matches_args(self, call):
+    def _matches_args(self, invocation):
         for i, constraint in enumerate(self._arg_constraints):
-            if not constraint.eval(call.args[i]):
+            if not constraint.eval(invocation.args[i]):
                 return False
         return True
 
-    def _matches_kwargs(self, call):
+    def _matches_kwargs(self, invocation):
         for kw, constraint in self._kwarg_constraints.iteritems():
-            if (not call.kwargs.has_key(kw) or
-                not constraint.eval(call.kwargs[kw])):
+            if (not invocation.kwargs.has_key(kw) or
+                not constraint.eval(invocation.kwargs[kw])):
                 return False
         return True
 
-    def matches(self, call):
-        return (self._matches_args(call) and
-                self._matches_kwargs(call))
+    def matches(self, invocation):
+        return (self._matches_args(invocation) and
+                self._matches_kwargs(invocation))
 
     
 class LeastArgumentsMatcher(AbstractArgumentsMatcher):
@@ -170,10 +170,10 @@ class LeastArgumentsMatcher(AbstractArgumentsMatcher):
     def _no_explicit_constraints_str(self):
         return "..."
 
-    def _matches_args(self, call):
-        if len(self._arg_constraints) > len(call.args):
+    def _matches_args(self, invocation):
+        if len(self._arg_constraints) > len(invocation.args):
             return False
-        return AbstractArgumentsMatcher._matches_args(self, call)
+        return AbstractArgumentsMatcher._matches_args(self, invocation)
 
 
 class AllArgumentsMatcher(AbstractArgumentsMatcher):
@@ -181,16 +181,16 @@ class AllArgumentsMatcher(AbstractArgumentsMatcher):
     def _no_explicit_constraints_str(self):
         return ""
 
-    def _matches_args(self, call):
-        if len(self._arg_constraints) != len(call.args):
+    def _matches_args(self, invocation):
+        if len(self._arg_constraints) != len(invocation.args):
             return False
-        return AbstractArgumentsMatcher._matches_args(self, call)
+        return AbstractArgumentsMatcher._matches_args(self, invocation)
 
-    def _matches_kwargs(self, call):
-        for call_kw in call.kwargs.iterkeys():
-            if call_kw not in self._kwarg_constraints:
+    def _matches_kwargs(self, invocation):
+        for invocation_kw in invocation.kwargs.iterkeys():
+            if invocation_kw not in self._kwarg_constraints:
                 return False
-        return AbstractArgumentsMatcher._matches_kwargs(self, call)
+        return AbstractArgumentsMatcher._matches_kwargs(self, invocation)
 
 
 class MethodMatcher(object):
@@ -201,8 +201,8 @@ class MethodMatcher(object):
     def __str__(self):
          return self._name
 
-    def matches(self, call):
-        return call.name == self._name
+    def matches(self, invocation):
+        return invocation.name == self._name
 
 
 class InvocationLog(object):
@@ -255,10 +255,10 @@ class AfterLabelMatcher(object):
         return self._invocation_log.has_been_invoked(self._label)
 
 
-class CallMocker(object):
+class InvocationMocker(object):
     
-    def __init__(self, call_matcher):
-        self._call_matcher = call_matcher
+    def __init__(self, invocation_matcher):
+        self._invocation_matcher = invocation_matcher
         self._method_matcher = None
         self._arguments_matcher = LeastArgumentsMatcher()
         self._action = is_void()
@@ -267,11 +267,11 @@ class CallMocker(object):
         self._label_matcher = None
 
     def is_satisfied(self):
-        return self._call_matcher.is_satisfied()
+        return self._invocation_matcher.is_satisfied()
 
     def invoke(self):
         InvocationLog.instance().invoked(self._label)
-        self._call_matcher.invoke()
+        self._invocation_matcher.invoke()
         return self._action.invoke()
     
     def is_void(self):
@@ -285,13 +285,13 @@ class CallMocker(object):
             suffix.append("label(%s)" % repr(self._label))
         if self._label_matcher is not None:
             suffix.append(str(self._label_matcher))
-        return "%s %s(%s)%s" % (self._call_matcher, self._method_matcher,
+        return "%s %s(%s)%s" % (self._invocation_matcher, self._method_matcher,
                                 self._arguments_matcher, ".".join(suffix))
     
-    def matches(self, call):
-        return (self._call_matcher.matches() and
-                self._method_matcher.matches(call) and
-                self._arguments_matcher.matches(call) and
+    def matches(self, invocation):
+        return (self._invocation_matcher.matches() and
+                self._method_matcher.matches(invocation) and
+                self._arguments_matcher.matches(invocation) and
                 (self._label_matcher is None or self._label_matcher.matches()))
 
     def _set_label(self, label, explicit):
@@ -344,7 +344,7 @@ class CallMocker(object):
         return self
 
 
-class MockCall(object):
+class MockInvocation(object):
 
     def __init__(self, name, args, kwargs):
         self.name = name
@@ -367,7 +367,8 @@ class MockedMethod(object):
         self._mock = mock
 
     def __call__(self, *args, **kwargs):
-        return self._mock._method_called(MockCall(self._name, args, kwargs))
+        return self._mock._method_invoked(
+            MockInvocation(self._name, args, kwargs))
 
 
 class Proxy(object):
@@ -397,40 +398,41 @@ class Mock(object):
                 unsatisfied.append(mocker)
         return unsatisfied
 
-    def _unmatched_method_called(self, call):
+    def _unmatched_method_invoked(self, invocation):
         unsatisfied_mockers = self._unsatisfied_mockers()
-        raise MatchError.create_unexpected_error(call, unsatisfied_mockers)
+        raise MatchError.create_unexpected_error(invocation,
+                                                 unsatisfied_mockers)
         
-    def _method_called(self, call):
+    def _method_invoked(self, invocation):
         matching_mocker = None
         for mocker in self._mockers:
-            if mocker.matches(call):
+            if mocker.matches(invocation):
                 try:
                     return mocker.invoke()
                 except InvokeConflictError:
-                    raise MatchError.create_conflict_error(call, mocker)
-        self._unmatched_method_called(call)
+                    raise MatchError.create_conflict_error(invocation, mocker)
+        self._unmatched_method_invoked(invocation)
 
     def _add_mocker(self, mocker):
         self._mockers.insert(0, mocker)
         
-    def expect(self, call_matcher):
+    def expect(self, invocation_matcher):
         """Define a method that is expected to be called.
 
-        @return: L{CallMocker}
+        @return: L{InvocationMocker}
         """
-        if call_matcher is None:
-            call_matcher = once()
-        mocker = CallMocker(call_matcher)
+        if invocation_matcher is None:
+            invocation_matcher = once()
+        mocker = InvocationMocker(invocation_matcher)
         self._add_mocker(mocker)
         return mocker
 
     def stub(self):
         """Define a method that may or may not be called.
 
-        @return: L{CallMocker}
+        @return: L{InvocationMocker}
         """
-        mocker = CallMocker(StubCallMatcher())
+        mocker = InvocationMocker(StubInvocationMatcher())
         self._add_mocker(mocker)
         return mocker
 
@@ -502,7 +504,7 @@ def raise_exception(exception):
 # Call match constraints
 ############################################################################## 
 
-class AbstractCallMatcher(object):
+class AbstractInvocationMatcher(object):
 
     def __init__(self):
         self._invoked = False
@@ -511,7 +513,7 @@ class AbstractCallMatcher(object):
         self._invoked = True
 
     
-class OnceCallMatcher(AbstractCallMatcher):
+class OnceInvocationMatcher(AbstractInvocationMatcher):
 
     def __str__(self):
         return "once"
@@ -526,12 +528,12 @@ class OnceCallMatcher(AbstractCallMatcher):
 def once():
     """Method will be called only once.
 
-    Convenience function for creating a L{OnceCallMatcher} instance.
+    Convenience function for creating a L{OnceInvocationMatcher} instance.
     """
-    return OnceCallMatcher()
+    return OnceInvocationMatcher()
 
 
-class AtLeastOnceCallMatcher(AbstractCallMatcher):
+class AtLeastOnceInvocationMatcher(AbstractInvocationMatcher):
 
     def __str__(self):
         return "at least once"
@@ -546,18 +548,19 @@ class AtLeastOnceCallMatcher(AbstractCallMatcher):
 def at_least_once():
     """Method will be called at least once.
 
-    Convenience function for creating a L{AtLeastOnceCallMatcher} instance.
+    Convenience function for creating a L{AtLeastOnceInvocationMatcher}
+    instance.
     """
-    return AtLeastOnceCallMatcher()
+    return AtLeastOnceInvocationMatcher()
 
 
-class NotCalledCallMatcher(AbstractCallMatcher):
+class NotCalledInvocationMatcher(AbstractInvocationMatcher):
 
     def __str__(self):
         return "not called"
 
     def invoke(self):
-        AbstractCallMatcher.invoke(self)
+        AbstractInvocationMatcher.invoke(self)
         raise InvokeConflictError
 
     def is_satisfied(self):
@@ -570,12 +573,12 @@ class NotCalledCallMatcher(AbstractCallMatcher):
 def not_called():
     """Method will not be called.
 
-    Convenience function for creating a L{NotCalledCallMatcher} instance.
+    Convenience function for creating a L{NotCalledInvocationMatcher} instance.
     """
-    return NotCalledCallMatcher()
+    return NotCalledInvocationMatcher()
 
 
-class StubCallMatcher(object):
+class StubInvocationMatcher(object):
 
     def invoke(self):
         pass
