@@ -16,6 +16,7 @@
 <li><a href="#MockBehaviour">Mock behaviour<a/></li>
 <li><a href="#Stubs">Stubs<a/></li>
 <li><a href="#FromImports"><code>from</code> imports<a/></li>
+<li><a href="#TestBaseClass">Test base class<a/></li>
 <li><a href="#FurtherInformation">Further information<a/></li>
 </ul>
 
@@ -144,6 +145,20 @@ The test code can be made more concise by importing the pmock module's public cl
 
     mock = Mock()
     mock.expects(once()).calculate(eq(34), eq(2)).will(return_value(68))
+</pre>
+
+<h2 id="TestBaseClass">Test base class</h2>
+
+The <code>MockTestCase</code> class is a convenience base class for tests. It provides the <code>mock</code> method for creating mock objects that will be automatically verified after the test method has run. The verify calls are made to the mock object after <code>tearDown</code> has been called.
+
+<pre>
+    class FooTest(pmock.MockTestCase):
+
+        def test_involving_mocks(self):
+            bar = self.mock()
+            bar.expects(pmock.once()).baz()
+            qux.quux(bar)
+            # no need for verify call as its done by MockTestCase
 </pre>
 
 <h2 id="FurtherInformation">Further information</h2>
