@@ -545,7 +545,7 @@ class MockTestCaseTest(unittest.TestCase):
                 mock.expects(pmock.once()).crow()
         test = Test('test_method')
         result = unittest.TestResult()
-        test.run(result)
+        test(result)
         self.assertEqual(len(result.failures), 1)
         self.assertEqual(len(result.errors), 0)
         traceback = result.failures[0][1]
@@ -559,10 +559,10 @@ class MockTestCaseTest(unittest.TestCase):
                 mock.crow()
         test = Test('test_method')
         result = unittest.TestResult()
-        test.run(result)
+        test(result)
         self.assertEqual(len(result.failures), 0)
         self.assertEqual(len(result.errors), 0)
 
-
+        
 if __name__ == '__main__':
     unittest.main()

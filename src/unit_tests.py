@@ -664,7 +664,7 @@ class MockTestCaseTest(unittest.TestCase):
                 pass
         test = Test('test_method')
         result = unittest.TestResult()
-        test.run(result)
+        test(result)
         self.assert_(result.wasSuccessful())
 
     def test_created_mock(self):
@@ -674,7 +674,7 @@ class MockTestCaseTest(unittest.TestCase):
                 created_mocks.append(self.mock())
         test = Test('test_method')
         result = unittest.TestResult()
-        test.run(result)
+        test(result)
         self.assert_(result.wasSuccessful(),
                      'errors %s, failures %s' % (result.errors,
                                                  result.failures))
@@ -688,7 +688,7 @@ class MockTestCaseTest(unittest.TestCase):
             def test_method(self):
                 self.mock().expects(matcher)
         test = Test('test_method')
-        test.run()
+        test()
         self.assert_(matcher.is_verified)
 
     def test_raised_verify_is_failure(self):
@@ -700,7 +700,7 @@ class MockTestCaseTest(unittest.TestCase):
                 self.mock().expects(matcher)
         test = Test('test_method')
         result = unittest.TestResult()
-        test.run(result)
+        test(result)
         self.assertEqual(len(result.failures), 1)
         self.assertEqual(len(result.errors), 0)
 
@@ -718,7 +718,7 @@ class MockTestCaseTest(unittest.TestCase):
                 self.mock().expects(matcher)
         test = Test('test_method')
         result = unittest.TestResult()
-        test.run()
+        test()
         self.assert_(matcher.is_verified)
         self.assertEqual(fixtures, ['setUp', 'tearDown'])
 

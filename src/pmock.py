@@ -508,11 +508,11 @@ class MockTestCase(unittest.TestCase):
         for mock in self._mocks:
             mock.verify()
     
-    def run(self, result=None):
+    def __call__(self, result=None):
         self._mocks = []
         self._real_test_method = getattr(self, self._test_method_name)
         setattr(self, self._test_method_name, self._auto_verified_test)
-        unittest.TestCase.run(self, result)
+        unittest.TestCase.__call__(self, result)
         setattr(self, self._test_method_name, self._real_test_method)
 
     def mock(self):
