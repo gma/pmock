@@ -356,12 +356,12 @@ class InvokeConflictError(Exception):
 class Mock(object):
 
     def __init__(self):
-        self._expected_mockers = []
+        self._mockers = []
         self._proxy = Proxy(self)
 
     def _unsatisfied_mockers(self):
         unsatisfied = []
-        for mocker in self._expected_mockers:
+        for mocker in self._mockers:
             if not mocker.is_satisfied():
                 unsatisfied.append(mocker)
         return unsatisfied
@@ -372,7 +372,7 @@ class Mock(object):
         
     def method_called(self, call):
         matching_mocker = None
-        for mocker in self._expected_mockers:
+        for mocker in self._mockers:
             if mocker.matches(call):
                 try:
                     return mocker.invoke()
@@ -380,10 +380,19 @@ class Mock(object):
                     raise MatchError.create_conflict_error(call, mocker)
         self._unmatched_method_called(call)
 
-    def expect(self, mocker=None):
-        if mocker is None:
-            mocker = once()
-        self._expected_mockers.insert(0, mocker)
+    def add_mocker(self, mocker):
+        self._mockers.insert(0, mocker)
+        
+    def expect(self, call_matcher=None):
+        if call_matcher is None:
+            call_matcher = once()
+        mocker = CallMocker(call_matcher)
+        self.add_mocker(mocker)
+        return mocker
+
+    def stub(self):
+        mocker = CallMocker(StubCallMatcher())
+        self.add_mocker(mocker)
         return mocker
 
     def proxy(self):
@@ -431,7 +440,7 @@ class throw_exception(object):
 # Call match constraints
 ############################################################################## 
 
-class CallMatcher(object):
+class AbstractCallMatcher(object):
 
     def __init__(self):
         self._invoked = False
@@ -440,7 +449,7 @@ class CallMatcher(object):
         self._invoked = True
 
     
-class OnceMatcher(CallMatcher):
+class OnceCallMatcher(AbstractCallMatcher):
 
     def __str__(self):
         return "once"
@@ -453,10 +462,10 @@ class OnceMatcher(CallMatcher):
 
 
 def once():
-    return CallMocker(OnceMatcher())
+    return OnceCallMatcher()
 
 
-class AtLeastOnceMatcher(CallMatcher):
+class AtLeastOnceCallMatcher(AbstractCallMatcher):
 
     def __str__(self):
         return "at least once"
@@ -469,16 +478,16 @@ class AtLeastOnceMatcher(CallMatcher):
 
 
 def at_least_once():
-    return CallMocker(AtLeastOnceMatcher())
+    return AtLeastOnceCallMatcher()
 
 
-class NotCalledMatcher(CallMatcher):
+class NotCalledCallMatcher(AbstractCallMatcher):
 
     def __str__(self):
         return "not called"
 
     def invoke(self):
-        CallMatcher.invoke(self)
+        AbstractCallMatcher.invoke(self)
         raise InvokeConflictError
 
     def is_satisfied(self):
@@ -489,7 +498,19 @@ class NotCalledMatcher(CallMatcher):
 
 
 def not_called():
-    return CallMocker(NotCalledMatcher())
+    return NotCalledCallMatcher()
+
+
+class StubCallMatcher(object):
+
+    def invoke(self):
+        pass
+
+    def is_satisfied(self):
+        return True
+        
+    def matches(self):
+        return True
 
 
 ##############################################################################

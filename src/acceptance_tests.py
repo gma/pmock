@@ -442,5 +442,31 @@ class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
         self.mock.proxy().madness()
 
 
+class StubTest(unittest.TestCase):
+
+    def test_specified_like_expectations(self):
+        mock = pmock.Mock()
+        mock.stub().method("fox")
+        mock.stub().method("fox").with_at_least("sly")
+        mock.stub().method("fox").with("sly", meal="chicken")
+        mock.stub().method("fox").will(pmock.return_value("trot"))
+        self.assertEqual(mock.proxy().fox(), "trot")
+        mock.proxy().fox("sly", meal="chicken")
+        mock.proxy().fox("sly")
+        mock.proxy().fox()
+
+    def test_uninvoked_doesnt_raise_verify(self):
+        mock = pmock.Mock()
+        mock.stub().method("fox")
+        mock.verify()
+
+    def test_expectation_can_use_for_ordering(self):
+        mock = pmock.Mock()
+        mock.stub().method("fox")
+        mock.expect().method("farmer").after("fox")
+        mock.proxy().fox()
+        mock.proxy().farmer()
+
+
 if __name__ == '__main__':
     unittest.main()

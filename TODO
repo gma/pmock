@@ -1,6 +1,5 @@
 todo:
 + add with() constraints and(), not(), or()
-+ stub() methods
 + support for python properties
 + docs, examples, web page
 
