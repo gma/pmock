@@ -1,11 +1,10 @@
 todo:
-+ change from GPL to python license
-+ PyPI registration 
-+ constrain allowable order of builder methods
++ support for properties
 + add constraints and(), not(), or()
 + build scripts in CVS (Scons?)
 
 possibly:
 + constraint base class to allow non-derived constraints to default to an equality match against the parameter. Would allow more compact argument constraints for the common case of equality e.g. mock.foo('bar').will(...)
++ constrain allowable order of builder methods
 + pull out dispatcher functionality to allow different matching strategies (LIFO, FIFO)?
-+ support for properties
+
