@@ -32,7 +32,7 @@ A mock object is created to represent a real object for the purposes of a unit t
 Expectations are defined in terms of the methods that are meant to be called on the mock object.
 
 <pre>
-    mock.expect().method("render")
+    mock.expects().method("render")
 </pre>
 
 The mock's proxy can now be called with the expected methods.
@@ -65,7 +65,7 @@ If any of the mock's expected methods haven't been called then the <code>verify<
 By default a method expectation defined on a mock will allow the mock to be called with any arguments. The expectation can be constrained to expect certain arguments using the <code>with</code> method.
 
 <pre>
-    mock.expect().method("render").with(pmock.eq(640), pmock.eq(480) )
+    mock.expects().method("render").with(pmock.eq(640), pmock.eq(480) )
 </pre>
 
 The arguments to the <code>with</code> method are constraint objects which are evaluated on the actual arguments when a call is made to the mock object.
@@ -73,7 +73,7 @@ The arguments to the <code>with</code> method are constraint objects which are e
 <p>The <code>with</code> method can also be used to constrain keyword arguments
 
 <pre>
-    mock.expect().method("render").with(brush=pmock.same(print.BIG_BRUSH))
+    mock.expects().method("render").with(brush=pmock.same(print.BIG_BRUSH))
 </pre>
 
 <h2 id="NumberOfCallsToTheSameMethod">Number of calls to the same method</h2>
@@ -81,8 +81,8 @@ The arguments to the <code>with</code> method are constraint objects which are e
 By default an expectation allows one call to the defined method. If the method is called again an exception will be raised. An optional parameter to the <code>expect</code> method allows more flexibility.
 
 <pre>
-    mock.expect(pmock.at_least_once()).method("fry").no_args()
-    mock.expect(pmock.not_called()).method("boil")
+    mock.expects(pmock.at_least_once()).method("fry").no_args()
+    mock.expects(pmock.never()).method("boil")
 </pre>
 
 
@@ -91,8 +91,8 @@ By default an expectation allows one call to the defined method. If the method i
 The order of calls to the mock object can be specified with the <code>after</code> method.
 
 <pre>
-    mock.expect().method("invalidate")
-    mock.expect().method("render").after("invalidate")
+    mock.expects().method("invalidate")
+    mock.expects().method("render").after("invalidate")
 </pre>
 
 If the calls are made out of order then an exception is raised.
@@ -100,9 +100,9 @@ If the calls are made out of order then an exception is raised.
 <p>An explicit label can defined on an expectation and then used in the <code>after</code> method rather than using the method name if convenient.
 
 <pre>
-    mock.expect().method("add").with(pmock.eq(10)).label("add #1")
-    mock.expect().method("add").with(pmock.eq(15)).label("add #2").after("add #1")
-    mock.expect().method("add").with(pmock.eq(5)).after("add #2")
+    mock.expects().method("add").with(pmock.eq(10)).label("add #1")
+    mock.expects().method("add").with(pmock.eq(15)).label("add #2").after("add #1")
+    mock.expects().method("add").with(pmock.eq(5)).after("add #2")
 </pre>
 
 
@@ -111,8 +111,8 @@ If the calls are made out of order then an exception is raised.
 Simple behaviours can be specified for the mock when an expected call is made using the <code>with</code> method.
 
 <pre>
-    mock.expect().method("calculate").will(pmock.return_value(20))
-    mock.expect().method("consume").will(pmock.raise_exception(RuntimeError("invalid"))
+    mock.expects().method("calculate").will(pmock.return_value(20))
+    mock.expects().method("consume").will(pmock.raise_exception(RuntimeError("invalid"))
 </pre>
 
 <h2 id="Stubs">Stubs</h2>
@@ -120,7 +120,7 @@ Simple behaviours can be specified for the mock when an expected call is made us
 Stubs allow behaviours to be specified for methods that we don't care whether they are called or not, and so don't need to be included in the mock's verification check.
 
 <pre>
-    mock.stub().method("sleep").is_void()
+    mock.stub().method("sleep").will(pmock.return_value(None))
 </pre>
 
 <h2 id="FromImports">From imports</h2>
@@ -131,7 +131,7 @@ The test code can be made more concise by importing the pmock classes and functi
     from pmock import *
 
     mock = Mock()
-    mock.expect().method("calulate").with(eq(34), eq(2)).will(return_value(68))
+    mock.expects().method("calulate").with(eq(34), eq(2)).will(return_value(68))
 </pre>
 
 <h2 id="FurtherInformation">Further information</h2>

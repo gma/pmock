@@ -38,22 +38,22 @@ class GreetingTest(unittest.TestCase):
         self.mock.verify()
 
     def test_afternoon(self):
-        self.mock.expect(once()).method("time").will(return_value((12,10)))
+        self.mock.expects(once()).method("time").will(return_value((12,10)))
         self.assertEqual(self.greeting.message(), "Good afternoon")
 
     def test_morning(self):
-        self.mock.expect(once()).method("time").will(return_value((6,50)))
+        self.mock.expects(once()).method("time").will(return_value((6,50)))
         self.assertEqual(self.greeting.message(), "Good morning")
 
     def test_evening(self):
-        self.mock.expect(once()).method("time").will(return_value((19,50)))
+        self.mock.expects(once()).method("time").will(return_value((19,50)))
         self.assertEqual(self.greeting.message(), "Good evening")
 
     def test_clock_failure(self):
         err_msg = "bzzz..malfunction"
         err = SystemError(err_msg)
-        self.mock.expect(once()).method("time").will(raise_exception(err))
-        self.mock.expect(once()).method("log").with(string_contains(err_msg))
+        self.mock.expects(once()).method("time").will(raise_exception(err))
+        self.mock.expects(once()).method("log").with(string_contains(err_msg))
         self.assertEqual(self.greeting.message(), "Good day")
         
 

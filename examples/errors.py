@@ -8,7 +8,7 @@ class ErrorsTest(unittest.TestCase):
 
     def test_unsatisfied_expectation(self):
         mock = Mock()
-        mock.expect(once()).method("foo")
+        mock.expects(once()).method("foo")
         mock.verify()
 
     def test_unexpected_call(self):
@@ -17,7 +17,7 @@ class ErrorsTest(unittest.TestCase):
 
     def test_conflicting_call(self):
         mock = Mock()
-        mock.expect(not_called()).method("foo")
+        mock.expects(never()).method("foo")
         mock.proxy().foo()
 
 

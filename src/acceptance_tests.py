@@ -8,14 +8,14 @@ class MockMethodTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("dog")
+        self.mock.expects(pmock.once()).method("dog")
         
     def test_uncalled_method(self):
         try:
             self.mock.verify()
             self.fail()
         except pmock.VerificationError, err:
-            self.assertUnsatisfiedMsg(err.msg, ["once dog(...)"])
+            self.assertUnsatisfiedMsg(err.msg, ["once dog"])
 
     def test_called_method(self):
         self.mock.proxy().dog()
@@ -30,7 +30,7 @@ class MockMethodTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
             self.mock.proxy().cat()
             self.fail()
         except pmock.MatchError, err:
-            self.assertUnexpectedCallMsg(err.msg, "cat()", ["once dog(...)"])
+            self.assertUnexpectedCallMsg(err.msg, "cat()", ["once dog"])
 
     def test_default_return_value(self):
         self.assertEqual(self.mock.proxy().dog(), None)
@@ -44,14 +44,14 @@ class MockMethodTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
             self.assertUnexpectedCallMsg(err.msg, "dog()", [])
 
 
-class MockMethodWithArgTestMixin(object):
+class MockMethodArgTestMixin(object):
 
     def test_uncalled_method(self):
         try:
             self.mock.verify()
             self.fail()
         except pmock.VerificationError, err:
-            self.assertUnsatisfiedMsg(err.msg, ["once dog(pmock.eq('bone'))"])
+            self.assertUnsatisfiedMsg(err.msg, self.expectation_strs())
 
     def test_method_with_correct_arg(self):
         self.mock.proxy().dog("bone")
@@ -63,7 +63,7 @@ class MockMethodWithArgTestMixin(object):
             self.fail()
         except pmock.MatchError, err:
             self.assertUnexpectedCallMsg(err.msg, "dog('carrot')",
-                                         ["once dog(pmock.eq('bone'))"])
+                                         self.expectation_strs())
 
     def test_call_method_with_insufficient_args(self):
         try:
@@ -71,37 +71,43 @@ class MockMethodWithArgTestMixin(object):
             self.fail()
         except pmock.MatchError, err:
             self.assertUnexpectedCallMsg(err.msg, "dog()",
-                                         ["once dog(pmock.eq('bone'))"])
+                                         self.expectation_strs())
 
     def test_method_with_correct_arg_and_extras(self):
         self.mock.proxy().dog("bone", "biscuit")
         self.mock.verify()
 
 
-class MockMethodWithArgTest(MockMethodWithArgTestMixin,
+class MockMethodWithArgTest(MockMethodArgTestMixin,
                             testsupport.ErrorMsgAssertsMixin,
                             unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("dog").with(pmock.eq("bone"))
+        self.mock.expects(pmock.once()).method("dog").with(pmock.eq("bone"))
 
+    def expectation_strs(self):
+        return ["once dog(pmock.eq('bone'))"]
+    
     def test_method_with_correct_arg_and_extras(self):
         try:
             self.mock.proxy().dog("bone", "biscuit")
         except pmock.MatchError, err:
             self.assertUnexpectedCallMsg(err.msg, "dog('bone', 'biscuit')",
-                                         ["once dog(pmock.eq('bone'))"])
+                                         self.expectation_strs())
 
 
-class MockMethodWithAtLeastArgTest(MockMethodWithArgTestMixin,
+class MockMethodWithAtLeastArgTest(MockMethodArgTestMixin,
                                    testsupport.ErrorMsgAssertsMixin,
                                    unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("dog").with_at_least(
+        self.mock.expects(pmock.once()).method("dog").with_at_least(
             pmock.eq("bone"))
+
+    def expectation_strs(self):
+        return ["once dog(pmock.eq('bone'), ...)"]
 
     def test_method_with_correct_arg_and_extras(self):
         self.mock.proxy().dog("bone", "biscuit")
@@ -114,7 +120,7 @@ class MockMethodWithArgsTest(testsupport.ErrorMsgAssertsMixin,
     def setUp(self):
         self.mock = pmock.Mock()
         self.toys = ["ball", "stick"]
-        self.mock.expect(pmock.once()).method("dog").with(
+        self.mock.expects(pmock.once()).method("dog").with(
             pmock.eq("bone"),
             pmock.same(self.toys),
             pmock.string_contains("slipper"))
@@ -134,15 +140,14 @@ class MockMethodWithArgsTest(testsupport.ErrorMsgAssertsMixin,
                                "pmock.string_contains('slipper'))"])
 
 
-class MockMethodWithKeywordArgTestMixin(object):
+class MockMethodKeywordArgTestMixin(object):
     
     def test_uncalled_method(self):
         try:
             self.mock.verify()
             self.fail()
         except pmock.VerificationError, err:
-            self.assertUnsatisfiedMsg(err.msg,
-                                      ["once dog(food=pmock.eq('bone'))"])
+            self.assertUnsatisfiedMsg(err.msg, self.expectation_strs())
 
     def test_method_with_correct_arg(self):
         self.mock.proxy().dog(food="bone")
@@ -154,7 +159,7 @@ class MockMethodWithKeywordArgTestMixin(object):
             self.fail()
         except pmock.MatchError, err:
             self.assertUnexpectedCallMsg(err.msg, "dog(food='ball')",
-                                         ["once dog(food=pmock.eq('bone'))"])
+                                         self.expectation_strs())
 
     def test_call_method_with_missing_arg(self):
         try:
@@ -162,18 +167,21 @@ class MockMethodWithKeywordArgTestMixin(object):
             self.fail()
         except pmock.MatchError, err:
             self.assertUnexpectedCallMsg(err.msg, "dog(toy='ball')",
-                                         ["once dog(food=pmock.eq('bone'))"])
+                                         self.expectation_strs())
 
 
-class MockMethodWithKeywordArgTest(MockMethodWithKeywordArgTestMixin,
+class MockMethodWithKeywordArgTest(MockMethodKeywordArgTestMixin,
                                    testsupport.ErrorMsgAssertsMixin,
                                    unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("dog").with(
+        self.mock.expects(pmock.once()).method("dog").with(
             food=pmock.eq("bone"))
 
+    def expectation_strs(self):
+        return ["once dog(food=pmock.eq('bone'))"]
+        
     def test_method_with_correct_arg_and_extra(self):
         try:
             self.mock.proxy().dog(toy="ball", food="bone")
@@ -183,14 +191,17 @@ class MockMethodWithKeywordArgTest(MockMethodWithKeywordArgTestMixin,
                                          ["once dog(food=pmock.eq('bone'))"])
 
 
-class MockMethodWithAtLeastKeywordArgTest(MockMethodWithKeywordArgTestMixin,
+class MockMethodWithAtLeastKeywordArgTest(MockMethodKeywordArgTestMixin,
                                           testsupport.ErrorMsgAssertsMixin,
                                           unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("dog").with_at_least(
+        self.mock.expects(pmock.once()).method("dog").with_at_least(
             food=pmock.eq("bone"))
+
+    def expectation_strs(self):
+        return ["once dog(food=pmock.eq('bone'), ...)"]
 
     def test_method_with_correct_arg_and_extra(self):
         self.mock.proxy().dog(toy="ball", food="bone")
@@ -202,7 +213,7 @@ class MockMethodWithNoArgsTest(testsupport.ErrorMsgAssertsMixin,
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("dog").no_args()
+        self.mock.expects(pmock.once()).method("dog").no_args()
 
     def test_method_with_no_args(self):
         self.mock.proxy().dog()
@@ -225,23 +236,38 @@ class MockMethodWithNoArgsTest(testsupport.ErrorMsgAssertsMixin,
                                          ["once dog()"])
 
 
+class MockMethodWithAnyArgsTest(testsupport.ErrorMsgAssertsMixin,
+                                unittest.TestCase):
+
+    def setUp(self):
+        self.mock = pmock.Mock()
+        self.mock.expects(pmock.once()).method("dog").any_args()
+
+    def test_method_with_no_args(self):
+        self.mock.proxy().dog()
+        self.mock.verify()
+
+    def test_method_with_args(self):
+        self.mock.proxy().dog("biscuit")
+        self.mock.verify()
+        
+    def test_method_with_kwargs(self):
+        self.mock.proxy().dog(toy="ball")
+        self.mock.verify()
+        
+
 class MockMethodWillTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
 
     def test_method_will_return_value(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("dog").will(
+        self.mock.expects(pmock.once()).method("dog").will(
             pmock.return_value("bone"))
         self.assertEqual(self.mock.proxy().dog(), "bone")
-
-    def test_method_is_void(self):
-        self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("dog").is_void()
-        self.assertEqual(self.mock.proxy().dog(), None)
 
     def test_method_will_raise_exception(self):
         self.mock = pmock.Mock()
         custom_err = RuntimeError()
-        self.mock.expect(pmock.once()).method("dog").will(
+        self.mock.expects(pmock.once()).method("dog").will(
             pmock.raise_exception(custom_err))
         try:
             self.mock.proxy().dog()
@@ -250,14 +276,23 @@ class MockMethodWillTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
             self.assert_(err is custom_err)
             self.mock.verify()
 
+    def test_unsatisfied_expectation_str(self):
+        self.mock = pmock.Mock()
+        self.mock.expects(pmock.once()).method("dog").will(
+            pmock.return_value("bone"))
+        try:
+            self.mock.verify()
+        except pmock.VerificationError, err:
+            self.assertUnsatisfiedMsg(err.msg, ["once dog, returns 'bone'"])
+
 
 class MockMultipleMethodsTest(testsupport.ErrorMsgAssertsMixin,
                               unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("cat")
-        self.mock.expect(pmock.once()).method("cat").with(pmock.eq("mouse"))
+        self.mock.expects(pmock.once()).method("cat")
+        self.mock.expects(pmock.once()).method("cat").with(pmock.eq("mouse"))
 
     def test_method_lifo_order(self):
          self.mock.proxy().cat("mouse")
@@ -276,13 +311,10 @@ class MockMultipleMethodsTest(testsupport.ErrorMsgAssertsMixin,
 class FifoExpectationTest(testsupport.ErrorMsgAssertsMixin,
                           unittest.TestCase):
 
-    # Currently expectations are matched in a LIFO manner which may be
-    # surprising
-    
     def test_method_fifo_order(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("cat").with(pmock.eq("mouse"))
-        self.mock.expect(pmock.once()).method("cat")
+        self.mock.expects(pmock.once()).method("cat").with(pmock.eq("mouse"))
+        self.mock.expects(pmock.once()).method("cat")
         self.mock.proxy().cat(food="mouse")
         try:
             self.mock.proxy().cat()
@@ -292,17 +324,17 @@ class FifoExpectationTest(testsupport.ErrorMsgAssertsMixin,
                                          ["once cat(pmock.eq('mouse'))"])
 
 
-class OnceCallTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
+class OnceTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("rabbit")
+        self.mock.expects(pmock.once()).method("rabbit")
 
     def test_uncalled(self):
         try:
             self.mock.verify()
         except pmock.VerificationError, err:
-            self.assertUnsatisfiedMsg(err.msg, ["once rabbit(...)"])
+            self.assertUnsatisfiedMsg(err.msg, ["once rabbit"])
 
     def test_call_once(self):
         self.mock.proxy().rabbit()
@@ -317,18 +349,17 @@ class OnceCallTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
             self.assertUnexpectedCallMsg(err.msg, "rabbit()", [])
 
 
-class AtLeastOnceCallTest(testsupport.ErrorMsgAssertsMixin,
-                          unittest.TestCase):
+class AtLeastOnceTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.at_least_once()).method("rabbit")
+        self.mock.expects(pmock.at_least_once()).method("rabbit")
 
     def test_uncalled(self):
         try:
             self.mock.verify()
         except pmock.VerificationError, err:
-            self.assertUnsatisfiedMsg(err.msg, ["at least once rabbit(...)"])
+            self.assertUnsatisfiedMsg(err.msg, ["at least once rabbit"])
 
     def test_call_once(self):
         self.mock.proxy().rabbit()
@@ -342,11 +373,11 @@ class AtLeastOnceCallTest(testsupport.ErrorMsgAssertsMixin,
         self.mock.verify()
 
 
-class NotCalledCallTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
+class NeverTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.not_called()).method("rabbit")
+        self.mock.expects(pmock.never()).method("rabbit")
 
     def test_uncalled(self):
         self.mock.verify()
@@ -357,7 +388,7 @@ class NotCalledCallTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
             self.fail()
         except pmock.MatchError, err:
             self.assertConflictedCallMsg(err.msg, "rabbit()",
-                                         "not called rabbit(...)")
+                                         "not called rabbit")
 
 
 class OrderedCallsBasicTest(testsupport.ErrorMsgAssertsMixin,
@@ -366,8 +397,8 @@ class OrderedCallsBasicTest(testsupport.ErrorMsgAssertsMixin,
     def setUp(self):
         pmock.MockTestCase.setUp(self)
         self.mock = pmock.Mock()
-        self.mock.expect(pmock.once()).method("bull").label("bull call")
-        self.mock.expect(pmock.once()).method("cow").after("bull call")
+        self.mock.expects(pmock.once()).method("bull").label("bull call")
+        self.mock.expects(pmock.once()).method("cow").after("bull call")
 
     def test_call_in_order(self):
         self.mock.proxy().bull()
@@ -380,8 +411,8 @@ class OrderedCallsBasicTest(testsupport.ErrorMsgAssertsMixin,
             self.fail()
         except pmock.MatchError, err:
             self.assertUnexpectedCallMsg(err.msg, "cow()",
-                                         ["once cow(...).after('bull call')",
-                                          "once bull(...).label('bull call')"])
+                                         ["once cow.after('bull call')",
+                                          "once bull [bull call]"])
             
 
 class OrderedCallsAcrossMocksTest(testsupport.ErrorMsgAssertsMixin,
@@ -391,8 +422,8 @@ class OrderedCallsAcrossMocksTest(testsupport.ErrorMsgAssertsMixin,
         pmock.MockTestCase.setUp(self)
         self.mock1 = pmock.Mock()
         self.mock2 = pmock.Mock()
-        self.mock1.expect(pmock.once()).method("bull").label("bull call")
-        self.mock2.expect(pmock.once()).method("cow").after("bull call")
+        self.mock1.expects(pmock.once()).method("bull").label("bull call")
+        self.mock2.expects(pmock.once()).method("cow").after("bull call")
 
     def test_call_in_order(self):
         self.mock1.proxy().bull()
@@ -406,7 +437,7 @@ class OrderedCallsAcrossMocksTest(testsupport.ErrorMsgAssertsMixin,
             self.fail()
         except pmock.MatchError, err:
             self.assertUnexpectedCallMsg(err.msg, "cow()",
-                                         ["once cow(...).after('bull call')"])
+                                         ["once cow.after('bull call')"])
 
 
 class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
@@ -416,16 +447,16 @@ class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
         self.mock = pmock.Mock()
 
     def test_method_name_as_label(self):
-        self.mock.expect(pmock.once()).method("bull")
-        self.mock.expect(pmock.once()).method("cow").after("bull")
+        self.mock.expects(pmock.once()).method("bull")
+        self.mock.expects(pmock.once()).method("cow").after("bull")
         self.mock.proxy().bull()
         self.mock.proxy().cow()
         self.mock.verify()
 
     def test_method_name_as_label_binds_to_last_matching_expectation(self):
-        self.mock.expect(pmock.once()).method("cow").with(pmock.eq("moo"))
-        self.mock.expect(pmock.once()).method("cow").with(pmock.eq("mooo"))
-        self.mock.expect(pmock.once()).method("bull").after("cow")
+        self.mock.expects(pmock.once()).method("cow").with(pmock.eq("moo"))
+        self.mock.expects(pmock.once()).method("cow").with(pmock.eq("mooo"))
+        self.mock.expects(pmock.once()).method("bull").after("cow")
         self.mock.proxy().cow("mooo")
         self.mock.proxy().bull()
         self.mock.proxy().cow("moo")
@@ -433,37 +464,37 @@ class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
 
     def test_after_undefined_label_raises(self):
         try:
-            self.mock.expect(pmock.once()).method("cow").after("ox")
+            self.mock.expects(pmock.once()).method("cow").after("ox")
             self.fail()
         except pmock.DefinitionError, err:
             self.assertUndefinedLabelMsg(err.msg, "ox")
 
     def test_disallow_duplicate_labels(self):
-        self.mock.expect(pmock.once()).method("cow").label("bovine")
+        self.mock.expects(pmock.once()).method("cow").label("bovine")
         try:
-            self.mock.expect(pmock.once()).method("bull").label("bovine")
+            self.mock.expects(pmock.once()).method("bull").label("bovine")
             self.fail()
         except pmock.DefinitionError, err:
             self.assertDuplicateLabelMsg(err.msg, "bovine",
-                                         "once cow(...).label('bovine')")
+                                         "once cow [bovine]")
 
     def test_disallow_duplicating_label_of_existing_method(self):
-        self.mock.expect(pmock.once()).method("cow")
+        self.mock.expects(pmock.once()).method("cow")
         try:
-            self.mock.expect(pmock.once()).method("bovine").label("cow")
+            self.mock.expects(pmock.once()).method("bovine").label("cow")
             self.fail()
         except pmock.DefinitionError, err:
-            self.assertDuplicateLabelMsg(err.msg, "cow", "once cow(...)")
+            self.assertDuplicateLabelMsg(err.msg, "cow", "once cow")
 
 
 class StubTest(unittest.TestCase):
 
     def test_specified_like_expectations(self):
         mock = pmock.Mock()
-        mock.stub().method("fox")
-        mock.stub().method("fox").with_at_least("sly")
-        mock.stub().method("fox").with("sly", meal="chicken")
-        mock.stub().method("fox").will(pmock.return_value("trot"))
+        mock.stubs().method("fox")
+        mock.stubs().method("fox").with_at_least("sly")
+        mock.stubs().method("fox").with("sly", meal="chicken")
+        mock.stubs().method("fox").will(pmock.return_value("trot"))
         self.assertEqual(mock.proxy().fox(), "trot")
         mock.proxy().fox("sly", meal="chicken")
         mock.proxy().fox("sly")
@@ -471,13 +502,13 @@ class StubTest(unittest.TestCase):
 
     def test_uninvoked_doesnt_raise_verify(self):
         mock = pmock.Mock()
-        mock.stub().method("fox")
+        mock.stubs().method("fox")
         mock.verify()
 
     def test_expectation_can_use_for_ordering(self):
         mock = pmock.Mock()
-        mock.stub().method("fox")
-        mock.expect(pmock.once()).method("farmer").after("fox")
+        mock.stubs().method("fox")
+        mock.expects(pmock.once()).method("farmer").after("fox")
         mock.proxy().fox()
         mock.proxy().farmer()
 

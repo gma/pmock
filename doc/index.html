@@ -17,7 +17,7 @@ import pmock
 class InstrumentTest(unittest.TestCase):
     def test_analysis(self):
         analyser_mock = pmock.Mock()
-        analyser_mock.expect().method("analyse").with(pmock.eq("123")).will(
+        analyser_mock.expects().method("analyse").with(pmock.eq("123")).will(
             pmock.return_value("30"))
         instrument = Instrument(analyser_mock)
         instrument.insert("sample#123")

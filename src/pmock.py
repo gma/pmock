@@ -7,8 +7,8 @@ testing. The api is modelled on the jmock mock object framework.
 
 Usage::
 
-    import unittest
     import pmock
+    import unittest
 
     class PowerStation(object):
         def start_up(self, reactor):
@@ -18,16 +18,16 @@ Usage::
                 reactor.shutdown()
 
     class PowerStationTestCase(unittest.TestCase):
-        def testSuccessfulActivation(self):
+        def test_successful_activation(self):
             mock = pmock.Mock()
-            mock.expect().method('activate').with(pmock.eq('core'))
+            mock.expects().method('activate').with(pmock.eq('core'))
             PowerStation().start_up(mock.proxy())
             mock.verify()
-        def testProblematicActivation(self):
+        def test_problematic_activation(self):
             mock = pmock.Mock()
-            mock.expect().method('activate').with(pmock.eq('core')).will(
+            mock.expects().method('activate').with(pmock.eq('core')).will(
                 pmock.throw_exception(RuntimeError('overheating')))
-            mock.expect().method('shutdown')
+            mock.expects().method('shutdown')
             PowerStation().start_up(mock.proxy())
             mock.verify()
 
@@ -55,9 +55,9 @@ import unittest
 ##############################################################################
 
 __all__ = ["Mock",
-           "once", "at_least_once", "not_called",
+           "once", "at_least_once", "never",
            "eq", "same", "string_contains", "functor",
-           "return_value", "raise_exception", "is_void"]
+           "return_value", "raise_exception"]
 
 
 ##############################################################################
@@ -71,8 +71,8 @@ class Error(AssertionError):
         self.msg = msg
 
     def _mockers_str(cls, mockers):
-        matchers_strs = [mocker.matchers_str() for mocker in mockers]
-        return ", ".join(matchers_strs)
+        mockers_strs = [str(mocker) for mocker in mockers]
+        return ", ".join(mockers_strs)
 
     _mockers_str = classmethod(_mockers_str)
 
@@ -93,7 +93,7 @@ class MatchError(Error):
     
     def create_conflict_error(cls, invocation, mocker):
         msg = ("call %s, conflicts with expectation: %s" %
-               (invocation, mocker.matchers_str()))
+               (invocation, str(mocker)))
         return MatchError(msg)
 
     create_conflict_error = classmethod(create_conflict_error)
@@ -134,18 +134,14 @@ class AbstractArgumentsMatcher(object):
         self._arg_constraints = arg_constraints
         self._kwarg_constraints = kwarg_constraints
 
-    def __str__(self):
-        if (len(self._arg_constraints) == 0 and
-            len(self._kwarg_constraints) == 0):
-            return self._no_explicit_constraints_str()
-        else:
-            arg_strs = [str(c) for c in self._arg_constraints]
-            keywords = self._kwarg_constraints.keys()
-            keywords.sort()
-            for kw in keywords:
-                constraint = self._kwarg_constraints[kw]
-                arg_strs.append("%s=%s" % (kw, str(constraint)))
-            return ", ".join(arg_strs)
+    def _arg_strs(self):
+        arg_strs = [str(c) for c in self._arg_constraints]
+        keywords = self._kwarg_constraints.keys()
+        keywords.sort()
+        for kw in keywords:
+            constraint = self._kwarg_constraints[kw]
+            arg_strs.append("%s=%s" % (kw, str(constraint)))
+        return arg_strs
 
     def _matches_args(self, invocation):
         for i, constraint in enumerate(self._arg_constraints):
@@ -167,8 +163,10 @@ class AbstractArgumentsMatcher(object):
     
 class LeastArgumentsMatcher(AbstractArgumentsMatcher):
 
-    def _no_explicit_constraints_str(self):
-        return "..."
+    def __str__(self):
+        arg_strs = AbstractArgumentsMatcher._arg_strs(self)
+        arg_strs.append("...")
+        return "(%s)" % ", ".join(arg_strs)
 
     def _matches_args(self, invocation):
         if len(self._arg_constraints) > len(invocation.args):
@@ -176,11 +174,14 @@ class LeastArgumentsMatcher(AbstractArgumentsMatcher):
         return AbstractArgumentsMatcher._matches_args(self, invocation)
 
 
+ANY_ARGS_MATCHER = LeastArgumentsMatcher()
+
+
 class AllArgumentsMatcher(AbstractArgumentsMatcher):
 
-    def _no_explicit_constraints_str(self):
-        return ""
-
+    def __str__(self):
+        return "(%s)" % ", ".join(AbstractArgumentsMatcher._arg_strs(self))
+        
     def _matches_args(self, invocation):
         if len(self._arg_constraints) != len(invocation.args):
             return False
@@ -193,11 +194,14 @@ class AllArgumentsMatcher(AbstractArgumentsMatcher):
         return AbstractArgumentsMatcher._matches_kwargs(self, invocation)
 
 
+NO_ARGS_MATCHER = AllArgumentsMatcher()
+
+
 class MethodMatcher(object):
 
     def __init__(self, name):
         self._name = name
-        
+
     def __str__(self):
          return self._name
 
@@ -249,22 +253,37 @@ class AfterLabelMatcher(object):
             raise DefinitionError.create_unregistered_label_error(label)
         
     def __str__(self):
-         return "after(%s)" % repr(self._label)
+         return ".after(%s)" % repr(self._label)
 
-    def matches(self):
+    def matches(self, invocation):
         return self._invocation_log.has_been_invoked(self._label)
 
 
 class InvocationMocker(object):
     
     def __init__(self, invocation_matcher):
+        self._matchers = []
         self._invocation_matcher = invocation_matcher
-        self._method_matcher = None
-        self._arguments_matcher = LeastArgumentsMatcher()
-        self._action = is_void()
+        self._matchers.append(invocation_matcher)
+        self._action = None
         self._label = None
-        self._explicit_label = None
-        self._label_matcher = None
+        self._is_explicit_label = False
+
+    def __str__(self):
+        strs = ["%s " % str(self._invocation_matcher)]
+        for matcher in self._matchers[1:]:
+            strs.append(str(matcher))
+        if self._action is not None:
+            strs.append(", %s" % self._action)
+        if self._is_explicit_label:
+            strs.append(" [%s]" % self._label)
+        return "".join(strs)
+
+    def add_matcher(self, matcher):
+        self._matchers.append(matcher)
+
+    def set_action(self, action):
+        self._action = action
 
     def is_satisfied(self):
         return self._invocation_matcher.is_satisfied()
@@ -272,79 +291,77 @@ class InvocationMocker(object):
     def invoke(self):
         InvocationLog.instance().invoked(self._label)
         self._invocation_matcher.invoke()
-        return self._action.invoke()
-    
-    def is_void(self):
-        """Method returns None."""
-        self._action = is_void()
-        return self
-    
-    def matchers_str(self):
-        suffix = [""]
-        if self._explicit_label:
-            suffix.append("label(%s)" % repr(self._label))
-        if self._label_matcher is not None:
-            suffix.append(str(self._label_matcher))
-        return "%s %s(%s)%s" % (self._invocation_matcher, self._method_matcher,
-                                self._arguments_matcher, ".".join(suffix))
-    
+        if self._action is not None:
+            return self._action.invoke()
+                    
     def matches(self, invocation):
-        return (self._invocation_matcher.matches() and
-                self._method_matcher.matches(invocation) and
-                self._arguments_matcher.matches(invocation) and
-                (self._label_matcher is None or self._label_matcher.matches()))
+        for matcher in self._matchers:
+            if not matcher.matches(invocation):
+                return False
+        return True
 
-    def _set_label(self, label, explicit):
+    def set_label(self, label, is_explicit):
         invocation_log = InvocationLog.instance()
-        if explicit and invocation_log.is_registered(label):
+        if is_explicit and invocation_log.is_registered(label):
             mocker = invocation_log.get_registered(label)
             raise DefinitionError.create_duplicate_label_error(
-                label, mocker.matchers_str())
+                label, str(mocker))
         self._label = label
-        self._explicit_label = explicit
+        self._is_explicit_label = is_explicit
         invocation_log.register(label, self)
+
+
+class InvocationMockerBuilder(object):
+
+    def __init__(self, mocker):
+        self._mocker = mocker
         
     def method(self, name):
         """Define method name."""
-        self._set_label(name, False)
-        self._method_matcher = MethodMatcher(name)
+        self._mocker.set_label(name, False)
+        self._mocker.add_matcher(MethodMatcher(name))
         return self
-
-    def will(self, action):
-        """Set action when method is called."""
-        self._action = action
-        return self
-    
+        
     def with(self, *arg_constraints, **kwarg_constraints):
         """Fully specify the method's arguments."""
-        self._arguments_matcher = AllArgumentsMatcher(arg_constraints,
-                                                      kwarg_constraints)
+        self._mocker.add_matcher(AllArgumentsMatcher(arg_constraints,
+                                                     kwarg_constraints))
         return self
 
     def with_at_least(self, *arg_constraints, **kwarg_constraints):
         """Specify the method's minimum required arguments."""
-        self._arguments_matcher = LeastArgumentsMatcher(arg_constraints,
-                                                        kwarg_constraints)
+        self._mocker.add_matcher(LeastArgumentsMatcher(arg_constraints,
+                                                       kwarg_constraints))
+        return self
+
+    def any_args(self):
+        """Method takes any arguments."""
+        self._mocker.add_matcher(ANY_ARGS_MATCHER)
         return self
 
     def no_args(self):
         """Method takes no arguments."""
-        self._arguments_matcher = AllArgumentsMatcher()
+        self._mocker.add_matcher(NO_ARGS_MATCHER)
+        return self
+
+    def will(self, action):
+        """Set action when method is called."""
+        self._mocker.set_action(action)
         return self
 
     def label(self, label_str):
         """Define a label for use in other mock's L{after} method."""
-        self._set_label(label_str, True)
+        self._mocker.set_label(label_str, True)
         return self
 
     def after(self, label):
         """Expected to be called after the method with supplied label."""
-        self._label_matcher = AfterLabelMatcher(label,
-                                                InvocationLog.instance())
+        self._mocker.add_matcher(AfterLabelMatcher(label,
+                                                   InvocationLog.instance()))
         return self
 
 
-class MockInvocation(object):
+class Invocation(object):
 
     def __init__(self, name, args, kwargs):
         self.name = name
@@ -360,15 +377,14 @@ class MockInvocation(object):
         return "%s(%s)" % (self.name, ", ".join(arg_strs))
 
 
-class MockedMethod(object):
+class BoundMethod(object):
 
     def __init__(self, name, mock):
         self._name = name
         self._mock = mock
 
     def __call__(self, *args, **kwargs):
-        return self._mock._method_invoked(
-            MockInvocation(self._name, args, kwargs))
+        return self._mock._method_invoked(Invocation(self._name, args, kwargs))
 
 
 class Proxy(object):
@@ -377,7 +393,7 @@ class Proxy(object):
         self._mock = mock
 
     def __getattr__(self, name):
-        return MockedMethod(name, self._mock)
+        return BoundMethod(name, self._mock)
 
 
 class InvokeConflictError(Exception):
@@ -416,7 +432,7 @@ class Mock(object):
     def _add_mocker(self, mocker):
         self._mockers.insert(0, mocker)
         
-    def expect(self, invocation_matcher):
+    def expects(self, invocation_matcher):
         """Define a method that is expected to be called.
 
         @return: L{InvocationMocker}
@@ -425,16 +441,16 @@ class Mock(object):
             invocation_matcher = once()
         mocker = InvocationMocker(invocation_matcher)
         self._add_mocker(mocker)
-        return mocker
+        return InvocationMockerBuilder(mocker)
 
-    def stub(self):
+    def stubs(self):
         """Define a method that may or may not be called.
 
         @return: L{InvocationMocker}
         """
         mocker = InvocationMocker(StubInvocationMatcher())
         self._add_mocker(mocker)
-        return mocker
+        return InvocationMockerBuilder(mocker)
 
     def proxy(self):
         """Return the mock object instance.""" 
@@ -463,6 +479,9 @@ class ReturnValueAction(object):
     def __init__(self, value):
         self._value = value
 
+    def __str__(self):
+        return "returns %s" % repr(self._value)
+
     def invoke(self):
         return self._value
 
@@ -475,18 +494,13 @@ def return_value(value):
     return ReturnValueAction(value)
 
 
-def is_void():
-    """Action that returns None.    
-
-    Convenience function for creating a L{ReturnValueAction} instance.
-    """
-    return ReturnValueAction(None)
-
-
 class RaiseExceptionAction(object):
 
     def __init__(self, exception):
         self._exception = exception
+
+    def __str__(self):
+        return "raises %s" % self._exception
 
     def invoke(self):
         raise self._exception
@@ -501,7 +515,7 @@ def raise_exception(exception):
 
 
 ##############################################################################
-# Call match constraints
+# Invocation matchers
 ############################################################################## 
 
 class AbstractInvocationMatcher(object):
@@ -521,7 +535,7 @@ class OnceInvocationMatcher(AbstractInvocationMatcher):
     def is_satisfied(self):
         return self._invoked
 
-    def matches(self):
+    def matches(self, invocation):
         return not self._invoked
 
 
@@ -541,7 +555,7 @@ class AtLeastOnceInvocationMatcher(AbstractInvocationMatcher):
     def is_satisfied(self):
         return self._invoked
 
-    def matches(self):
+    def matches(self, invocation):
         return True
 
 
@@ -566,11 +580,11 @@ class NotCalledInvocationMatcher(AbstractInvocationMatcher):
     def is_satisfied(self):
         return not self._invoked
         
-    def matches(self):
+    def matches(self, invocation):
         return True
 
 
-def not_called():
+def never():
     """Method will not be called.
 
     Convenience function for creating a L{NotCalledInvocationMatcher} instance.
@@ -586,7 +600,7 @@ class StubInvocationMatcher(object):
     def is_satisfied(self):
         return True
         
-    def matches(self):
+    def matches(self, invocation):
         return True
 
 
