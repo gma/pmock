@@ -1,11 +1,11 @@
-'''
+"""
 Python mock object framework, based on the jmock Java mock object
 framework.
 
 This module provides support for creating mock objects for use in unit
 testing. The api is modelled on the jmock mock object framework.
 
-Simple usage:
+Usage::
 
     import unittest
     import pmock
@@ -35,14 +35,13 @@ Simple usage:
         unittest.main()
 
 Further information is available in the bundled documentation, and from
-
-  http://pmock.sourceforge.net/
+http://pmock.sourceforge.net/
 
 Copyright (c) 2004, Graham Carlyle
 
 This module is free software, and you may redistribute it and/or modify
 it under the terms of the GNU GPL.
-'''
+"""
 
 __author__ = "Graham Carlyle"
 __email__ = "grahamcarlyle at users dot sourceforge dot net"
@@ -54,7 +53,11 @@ import unittest
 ##############################################################################
 # Exported classes and functions
 ##############################################################################
-__all__ = []
+
+__all__ = ["Mock",
+           "once", "at_least_once", "not_called",
+           "eq", "same", "string_contains", "functor",
+           "return_value", "raise_exception", "is_void"]
 
 
 ##############################################################################
@@ -75,7 +78,8 @@ class Error(AssertionError):
 
 
 class VerificationError(Error):
-
+    """All the expectations have not been met."""
+    
     def create_unsatisfied_error(cls, unsatisfied_mockers):
         msg = ("unsatisfied expectation(s): %s" %
                cls._mockers_str(unsatisfied_mockers))
@@ -85,7 +89,8 @@ class VerificationError(Error):
 
 
 class MatchError(Error):
-
+    """Method call unexpected or conflicts with expectations."""
+    
     def create_conflict_error(cls, call, mocker):
         msg = ("call %s, conflicts with expectation: %s" %
                (call, mocker.matchers_str()))
@@ -106,6 +111,7 @@ class MatchError(Error):
 
 
 class DefinitionError(Error):
+    """Expectation definition isn't valid."""
 
     def create_unregistered_label_error(cls, label):
         msg = ("reference to undefined label: %s" % label)
@@ -259,6 +265,7 @@ class CallMocker(object):
         return self._action.invoke()
     
     def is_void(self):
+        """Method returns None."""
         self._action = is_void()
         return self
     
@@ -283,32 +290,39 @@ class CallMocker(object):
         InvocationLog.instance().register(label)
         
     def method(self, name):
+        """Define method name."""
         self._set_label(name, False)
         self._method_matcher = MethodMatcher(name)
         return self
 
     def will(self, action):
+        """Set action when method is called."""
         self._action = action
         return self
     
     def with(self, *arg_constraints, **kwarg_constraints):
+        """Fully specify the method's arguments."""
         self._arguments_matcher = AllArgumentsMatcher(arg_constraints,
                                                       kwarg_constraints)
         return self
 
     def with_at_least(self, *arg_constraints, **kwarg_constraints):
+        """Specify the method's minimum required arguments."""
         self._arguments_matcher = LeastArgumentsMatcher(arg_constraints,
                                                         kwarg_constraints)
         return self
 
     def no_args(self):
+        """Method takes no arguments."""
         self._arguments_matcher = AllArgumentsMatcher()
 
     def label(self, label_str):
+        """Define a label for use in other mock's L{after} method."""
         self._set_label(label_str, True)
         return self
 
     def after(self, label):
+        """Expected to be called after the method with supplied label."""
         self._label_matcher = AfterLabelMatcher(label,
                                                 InvocationLog.instance())
         return self
@@ -337,7 +351,7 @@ class MockedMethod(object):
         self._mock = mock
 
     def __call__(self, *args, **kwargs):
-        return self._mock.method_called(MockCall(self._name, args, kwargs))
+        return self._mock._method_called(MockCall(self._name, args, kwargs))
 
 
 class Proxy(object):
@@ -354,6 +368,7 @@ class InvokeConflictError(Exception):
 
 
 class Mock(object):
+    """Define a mock object's expectations and simple behaviour."""
 
     def __init__(self):
         self._mockers = []
@@ -370,7 +385,7 @@ class Mock(object):
         unsatisfied_mockers = self._unsatisfied_mockers()
         raise MatchError.create_unexpected_error(call, unsatisfied_mockers)
         
-    def method_called(self, call):
+    def _method_called(self, call):
         matching_mocker = None
         for mocker in self._mockers:
             if mocker.matches(call):
@@ -380,32 +395,43 @@ class Mock(object):
                     raise MatchError.create_conflict_error(call, mocker)
         self._unmatched_method_called(call)
 
-    def add_mocker(self, mocker):
+    def _add_mocker(self, mocker):
         self._mockers.insert(0, mocker)
         
     def expect(self, call_matcher=None):
+        """Define a method that is expected to be called.
+
+        @return: L{CallMocker}
+        """
         if call_matcher is None:
             call_matcher = once()
         mocker = CallMocker(call_matcher)
-        self.add_mocker(mocker)
+        self._add_mocker(mocker)
         return mocker
 
     def stub(self):
+        """Define a method that may or may not be called.
+
+        @return: L{CallMocker}
+        """
         mocker = CallMocker(StubCallMatcher())
-        self.add_mocker(mocker)
+        self._add_mocker(mocker)
         return mocker
 
     def proxy(self):
+        """Return the mock object instance.""" 
         return self._proxy
     
     def verify(self):
+        """Check that the mock object has been called as expected."""
         unsatisfied = self._unsatisfied_mockers()
         if len(unsatisfied) > 0:
             raise VerificationError.create_unsatisfied_error(unsatisfied)
 
 
 class MockTestCase(unittest.TestCase):
-
+    """Unit test base class to help reset ordering expectations."""
+    
     def setUp(self):
         InvocationLog.instance().clear()
 
@@ -414,8 +440,8 @@ class MockTestCase(unittest.TestCase):
 # Mocked method actions
 ############################################################################## 
 
-class return_value(object):
-
+class ReturnValueAction(object):
+    
     def __init__(self, value):
         self._value = value
 
@@ -423,17 +449,38 @@ class return_value(object):
         return self._value
 
 
+def return_value(value):
+    """Action that returns the supplied value.    
+
+    Convenience function for creating a L{ReturnValueAction} instance.
+    """
+    
+    return ReturnValueAction(value)
+
+
 def is_void():
-    return return_value(None)
+    """Action that returns None.    
+
+    Convenience function for creating a L{ReturnValueAction} instance.
+    """
+    return ReturnValueAction(None)
 
 
-class throw_exception(object):
+class RaiseExceptionAction(object):
 
     def __init__(self, exception):
         self._exception = exception
 
     def invoke(self):
         raise self._exception
+
+
+def raise_exception(exception):
+    """Action that raises the supplied exception.    
+
+    Convenience function for creating a L{RaiseExceptionAction} instance.
+    """
+    return RaiseExceptionAction(exception)
 
 
 ##############################################################################
@@ -462,6 +509,10 @@ class OnceCallMatcher(AbstractCallMatcher):
 
 
 def once():
+    """Method will be called only once.
+
+    Convenience function for creating a L{OnceCallMatcher} instance.
+    """
     return OnceCallMatcher()
 
 
@@ -478,6 +529,10 @@ class AtLeastOnceCallMatcher(AbstractCallMatcher):
 
 
 def at_least_once():
+    """Method will be called at least once.
+
+    Convenience function for creating a L{AtLeastOnceCallMatcher} instance.
+    """
     return AtLeastOnceCallMatcher()
 
 
@@ -498,6 +553,10 @@ class NotCalledCallMatcher(AbstractCallMatcher):
 
 
 def not_called():
+    """Method will not be called.
+
+    Convenience function for creating a L{NotCalledCallMatcher} instance.
+    """
     return NotCalledCallMatcher()
 
 
@@ -517,7 +576,7 @@ class StubCallMatcher(object):
 # Argument constraints
 ############################################################################## 
 
-class eq(object):
+class EqConstraint(object):
 
     def __init__(self, expected):
         self._expected = expected
@@ -529,7 +588,15 @@ class eq(object):
         return self._expected == arg
 
 
-class same(object):
+def eq(expected):
+    """Argument will be equal to supplied value.
+
+    Convenience function for creating a L{EqConstraint} instance.
+    """
+    return EqConstraint(expected)
+
+
+class SameConstraint(object):
 
     def __init__(self, expected):
         self._expected = expected
@@ -541,7 +608,15 @@ class same(object):
         return self._expected is arg
 
 
-class string_contains(object):
+def same(expected):
+    """Argument will be the same as the supplied reference.
+
+    Convenience function for creating a L{SameConstraint} instance.
+    """
+    return SameConstraint(expected)
+
+
+class StringContainsConstraint(object):
 
     def __init__(self, expected):
         self._expected = expected
@@ -553,7 +628,15 @@ class string_contains(object):
         return (arg is not None) and (arg.find(self._expected) != -1)
 
 
-class functor(object):
+def string_contains(expected):
+    """Argument contains the supplied substring.
+
+    Convenience function for creating a L{StringContainsConstraint} instance.
+    """
+    return StringContainsConstraint(expected)
+
+
+class FunctorConstraint(object):
 
     def __init__(self, boolean_functor):
         self._boolean_functor = boolean_functor
@@ -564,3 +647,10 @@ class functor(object):
     def eval(self, arg):
         return self._boolean_functor(arg)
 
+
+def functor(boolean_functor):
+    """Supplied unary function evaluates to True when called with argument.
+
+    Convenience function for creating a L{FunctorConstraint} instance.
+    """
+    return FunctorConstraint(boolean_functor)

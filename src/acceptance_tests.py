@@ -233,11 +233,11 @@ class MockMethodWillTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
         self.mock.expect().method("dog").is_void()
         self.assertEqual(self.mock.proxy().dog(), None)
 
-    def test_method_will_throw_exception(self):
+    def test_method_will_raise_exception(self):
         self.mock = pmock.Mock()
         custom_err = RuntimeError()
         self.mock.expect().method("dog").will(pmock.
-                                              throw_exception(custom_err))
+                                              raise_exception(custom_err))
         try:
             self.mock.proxy().dog()
             self.fail()

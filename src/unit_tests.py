@@ -361,7 +361,7 @@ class ProxyTest(unittest.TestCase):
 
     def test_method_call(self):
         class Mock:
-            def method_called(self, call):
+            def _method_called(self, call):
                 self.call = call
         mock = Mock()
         proxy = pmock.Proxy(mock)
@@ -384,7 +384,7 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
             def invoke(self): self.invoked = True
         mocker = Mocker()
         mock = pmock.Mock()
-        mock.add_mocker(mocker)
+        mock._add_mocker(mocker)
         mock.proxy().wolf()
         self.assert_(mocker.invoked)
 
@@ -394,7 +394,7 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
             def is_satisfied(self): return False
             def matchers_str(self): return "unsatisfied"
         mock = pmock.Mock()
-        mock.add_mocker(Mocker())
+        mock._add_mocker(Mocker())
         try:
             mock.proxy().wolf()
             fail("should have raised due to unexpected method call")
@@ -419,9 +419,9 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
         mocker2 = Mocker(True)
         mocker3 = Mocker(False)
         mock = pmock.Mock()
-        mock.add_mocker(mocker1)
-        mock.add_mocker(mocker2)
-        mock.add_mocker(mocker3)
+        mock._add_mocker(mocker1)
+        mock._add_mocker(mocker2)
+        mock._add_mocker(mocker3)
         mock.proxy().wolf()
         self.assert_(mocker1.match_attempt is None)
         self.assert_(not mocker1.invoked)
@@ -435,7 +435,7 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
             def is_satisfied(self): return False
             def matchers_str(self): return "unsatisfied"
         mock = pmock.Mock()
-        mock.add_mocker(Mocker())
+        mock._add_mocker(Mocker())
         try:
             mock.verify()
             fail("should have raised due to unsatisfied mocker")
@@ -446,7 +446,7 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
         class Mocker:
             def is_satisfied(self): return True
         mock = pmock.Mock()
-        mock.add_mocker(Mocker())
+        mock._add_mocker(Mocker())
         mock.verify()
 
     def test_conflicting_mocker(self):
@@ -455,7 +455,7 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
             def invoke(self): raise pmock.InvokeConflictError
             def matchers_str(self): return "conflicted"
         mock = pmock.Mock()
-        mock.add_mocker(Mocker())
+        mock._add_mocker(Mocker())
         try:
             mock.proxy().wolf()
             fail("should have raised due to conflicting mocker")
@@ -493,6 +493,23 @@ class MockTestCaseTest(unittest.TestCase):
         pmock.InvocationLog.instance().invoked("bat")
         test.run()
         self.assert_(pmock.InvocationLog.instance().has_been_invoked("bat"))
+
+
+class ReturnValueTest(unittest.TestCase):
+
+    def test_invoke(self):
+        self.assertEqual(pmock.ReturnValueAction("owl").invoke(), "owl")
+
+
+class RaiseExceptionAction(unittest.TestCase):
+
+    def test_invoke(self):
+        exception = RuntimeError("owl")
+        try:
+            pmock.RaiseExceptionAction(exception).invoke()
+            fail("expected exception to be raised")
+        except RuntimeError, err:
+            self.assertEqual(err, exception)
 
 
 class OnceCallMatcherTest(unittest.TestCase):
@@ -576,61 +593,62 @@ class StubCallMatcherTest(unittest.TestCase):
 class EqConstraintTest(unittest.TestCase):
 
     def test_match(self):
-        self.assert_(pmock.eq("mouse").eval("mouse"))
+        self.assert_(pmock.EqConstraint("mouse").eval("mouse"))
 
     def test_umatched(self):
-        self.assert_(not pmock.eq("mouse").eval("rat"))
+        self.assert_(not pmock.EqConstraint("mouse").eval("rat"))
         
     def test_str(self):
-        self.assertEqual(str(pmock.eq("mouse")),
+        self.assertEqual(str(pmock.EqConstraint("mouse")),
                          "pmock.eq('mouse')")
-
+        
 
 class SameConstraintTest(unittest.TestCase):
 
     def test_match(self):
         mutable = ["mouse"]
-        self.assert_(pmock.same(mutable).eval(mutable))
+        self.assert_(pmock.SameConstraint(mutable).eval(mutable))
 
     def test_umatched(self):
-        self.assert_(not pmock.same(["mouse"]).eval(["mouse"]))
+        self.assert_(not pmock.SameConstraint(["mouse"]).eval(["mouse"]))
         
     def test_str(self):
-        self.assertEqual(str(pmock.same(["mouse"])),
+        self.assertEqual(str(pmock.SameConstraint(["mouse"])),
                          "pmock.same(['mouse'])")
 
 
 class StringContainsConstraintTest(unittest.TestCase):
 
     def test_matches_same_string(self):
-        self.assert_(pmock.string_contains("mouse").eval("mouse"))
+        self.assert_(pmock.StringContainsConstraint("mouse").eval("mouse"))
         
     def test_matches_substring(self):
-        self.assert_(pmock.string_contains("mo").eval("mouse"))
-        self.assert_(pmock.string_contains("ou").eval("mouse"))
-        self.assert_(pmock.string_contains("se").eval("mouse"))
-        self.assert_(pmock.string_contains("").eval("mouse"))
+        self.assert_(pmock.StringContainsConstraint("mo").eval("mouse"))
+        self.assert_(pmock.StringContainsConstraint("ou").eval("mouse"))
+        self.assert_(pmock.StringContainsConstraint("se").eval("mouse"))
+        self.assert_(pmock.StringContainsConstraint("").eval("mouse"))
         
     def test_umatched(self):
-        self.assert_(not pmock.string_contains("mouse").eval("rat"))
-        self.assert_(not pmock.string_contains("mouse").eval(None))
+        self.assert_(not pmock.StringContainsConstraint("mouse").eval("rat"))
+        self.assert_(not pmock.StringContainsConstraint("mouse").eval(None))
 
     def test_str(self):
-        self.assertEqual(str(pmock.string_contains("mouse")),
+        self.assertEqual(str(pmock.StringContainsConstraint("mouse")),
                          "pmock.string_contains('mouse')")
 
 
 class FunctorConstraintTest(unittest.TestCase):
 
     def test_matches(self):
-        self.assert_(pmock.functor(lambda arg: True).eval("mouse"))
+        self.assert_(pmock.FunctorConstraint(lambda arg: True).eval("mouse"))
         
     def test_umatched(self):
-        self.assert_(not pmock.functor(lambda arg: False).eval("mouse"))
+        self.assert_(
+            not pmock.FunctorConstraint(lambda arg: False).eval("mouse"))
 
     def test_str(self):
         lambda_ = lambda arg: False
-        self.assertEqual(str(pmock.functor(lambda_)),
+        self.assertEqual(str(pmock.FunctorConstraint(lambda_)),
                          "pmock.functor(%s)" % repr(lambda_))
 
 
