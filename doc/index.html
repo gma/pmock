@@ -15,10 +15,9 @@
 import pmock
 ...
 class InstrumentTest(unittest.TestCase):
-    def test_analysis(self):
+    def test_low_quality_analysis(self):
         analyser_mock = pmock.Mock()
-        analyser_mock.expects().analyse(pmock.eq("123")).will(
-            pmock.return_value("30"))
+        analyser_mock.expects().analyse(pmock.eq("123")).will(pmock.return_value("30"))
         instrument = Instrument(analyser_mock)
         instrument.insert("sample#123")
         self.assert_(instrument.is_low_quality_indicator_on())
@@ -41,7 +40,7 @@ See the <a href="overview.html">overview</a> for an introduction on how to use p
 
 <h2>Requirements</h2>
 <ul>
-<li>pMock is currently written for versions of Python > 2.3</li>
+<li>pMock is currently written for versions of Python >= 2.3</li>
 <li>pMock is licensed under the GPL</li>
 </ul>
 

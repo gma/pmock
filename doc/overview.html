@@ -21,7 +21,7 @@
 
 <h2 id="CreatingMocks">Creating mocks</h2>
 
-A mock object is created to represent a real object for the purposes of a unit test. Using a mock object rather than the real object can be useful if the real object is difficult to construct, doesn't exist yet or causes awkward side effects.
+A mock object is created to represent a real object for the purposes of a unit test. Using a mock object rather than the real object can be useful if the real object is difficult to construct, hasn't been written yet or causes awkward side effects in use.
 
 <pre>
     import pmock
@@ -29,26 +29,26 @@ A mock object is created to represent a real object for the purposes of a unit t
     mock = pmock.Mock()
 </pre>
 
-Expectations are defined in terms of the methods that are meant to be called on the mock object.
+Expectations are defined for the methods that are meant to be called on the mock object.
 
 <pre>
     mock.expects(pmock.once()).render()
 </pre>
 
-The mock can now be called with the expected methods.
+The mock can now be called with the expected method.
 
 <pre>
     mock.render()
 </pre>
 
-Calling the proxy with unexpected methods causes an exception to be raised.
+Calling the mock with unexpected methods causes an exception to be raised.
 
-<p>When the mock objects have been set up, they are then used in the unit test as the real objects, that they are mocking, would have been.
+<p>When the mock objects have been set up, they are then used in the unit test as the real objects would have been.
 
 <pre>
     pictures = [mock]
-    manager = PictureManager(pictures)
-    manager.render()
+    gallery = Gallery(pictures)
+    gallery.render()
 </pre>
 
 After the test's normal assertions have been made, an assertion on the mocks' expectations is made.
@@ -57,7 +57,7 @@ After the test's normal assertions have been made, an assertion on the mocks' ex
     mock.verify()
 </pre>
 
-If any of the mock's expected methods haven't been called then the <code>verify</code> call raises an exception.
+If any of the mock's expectations haven't been satisfied, such as an expected method not having been called, then the <code>verify</code> call raises an exception.
 
 <h2 id="ArgumentExpectations">Argument expectations</h2>
 
@@ -67,7 +67,7 @@ Expectations can be set on the arguments passed to the mock's methods.
     mock.expects(pmock.once()).render(pmock.eq(640), pmock.eq(480))
 </pre>
 
-The arguments to the expectation's mocked method are constraint objects which are evaluated on the actual arguments when a call is made to the mock object.
+The arguments to the expectation's mocked method are constraint objects which are evaluated on the actual arguments when a call is made to the mock object. If an argument doesn't satisfy its constraint then an exception is raised.
 
 <pre>
     mock.expects(pmock.once()).render(brush=pmock.same(print.BIG_BRUSH))
@@ -93,7 +93,7 @@ The argument to the <code>expects</code> method describes how often the expected
 
 <h2 id="CallOrderExpectations">Call order expectations</h2>
 
-The order of calls to the mock object can be specified with the <code>after</code> method.
+The order of calls to the mock object can be described with the <code>after</code> method.
 
 <pre>
     mock.expects(pmock.once()).invalidate()
@@ -102,7 +102,7 @@ The order of calls to the mock object can be specified with the <code>after</cod
 
 If the calls are made out of order then an exception is raised.
 
-<p>An explicit label can be set for an expectation and used in the <code>after</code> method instead of using the method name if needed.
+<p>An explicit label can be set for an expectation and used in the <code>after</code> method instead of using the method name.
 
 <pre>
     mock.expects(pmock.once()).add(pmock.eq(10)).label("add #1")
@@ -122,7 +122,7 @@ The order of calls can also be defined across different mock objects.
 
 <h2 id="MockBehaviour">Mock behaviour</h2>
 
-Simple behaviours can be specified for the mock when an expected call is made using the <code>with</code> method.
+The mocked methods can be provided with simple behaviours using the <code>will</code> method.
 
 <pre>
     mock.expects(pmock.once()).calculate().will(pmock.return_value(20))
@@ -131,10 +131,10 @@ Simple behaviours can be specified for the mock when an expected call is made us
 
 <h2 id="Stubs">Stubs</h2>
 
-Stubs allow behaviours to be specified for methods that we don't care whether they are called or not, and so don't need to be included in the mock's verification check.
+Stubs allow behaviours to be specified for methods that can be called any number of times and are not to be included in the mock's verification check.
 
 <pre>
-    mock.stubs(pmock.once()).sleep().will(pmock.return_value(None))
+    mock.stubs(pmock.once()).sleep().will(pmock.return_value(True))
 </pre>
 
 <h2 id="FromImports">From imports</h2>
