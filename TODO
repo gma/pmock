@@ -1,5 +1,5 @@
 todo:
-+ add with() constraints and(), not(), or()
++ add constraints and(), not(), or()
 + support for python properties
 + docs, examples, web page
 
