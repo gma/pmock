@@ -1,9 +1,8 @@
 """
-Python mock object framework, based on the jmock Java mock object
-framework.
+Python mock object framework, providing support for creating mock
+objects for use in unit testing.
 
-This module provides support for creating mock objects for use in unit
-testing. The api is modelled on the jmock mock object framework.
+The api is modelled on the jmock mock object framework.
 
 Usage::
 
@@ -46,8 +45,6 @@ it under the terms of the GNU GPL.
 __author__ = "Graham Carlyle"
 __email__ = "grahamcarlyle at users dot sourceforge dot net"
 __version__ = "0.2"
-
-import unittest
 
 
 ##############################################################################
@@ -160,6 +157,9 @@ class AbstractArgumentsMatcher(object):
         return (self._matches_args(invocation) and
                 self._matches_kwargs(invocation))
 
+    def invoked(self, invocation):
+        pass
+
     
 class LeastArgumentsMatcher(AbstractArgumentsMatcher):
 
@@ -208,6 +208,9 @@ class MethodMatcher(object):
     def matches(self, invocation):
         return invocation.name == self._name
 
+    def invoked(self, invocation):
+        pass
+
 
 class InvocationLog(object):
 
@@ -244,6 +247,9 @@ class AfterLabelMatcher(object):
         mocker = self._invocation_log.get_registered(self._label)
         return mocker.has_been_invoked()
 
+    def invoked(self, invocation):
+        pass
+
 
 class InvocationMocker(object):
     
@@ -274,11 +280,12 @@ class InvocationMocker(object):
     def is_satisfied(self):
         return self._invocation_matcher.is_satisfied()
 
-    def invoke(self):
+    def invoke(self, invocation):
         self._has_been_invoked = True
-        self._invocation_matcher.invoke()
+        for matcher in self._matchers:
+            matcher.invoked(invocation)
         if self._action is not None:
-            return self._action.invoke()
+            return self._action.invoke(invocation)
 
     def has_been_invoked(self):
         return self._has_been_invoked
@@ -343,8 +350,8 @@ class MatchBuilder(InvocationMockerBuilder):
         if other_mock is None:
             matcher = AfterLabelMatcher(label_str, self._invocation_log)
         else:
-            if other_mock.name is not None:
-                description = repr(other_mock.name)
+            if other_mock.get_name() is not None:
+                description = repr(other_mock.get_name())
             else:
                 description = str(other_mock)
             matcher = AfterLabelMatcher(label_str, other_mock._invocation_log,
@@ -396,16 +403,17 @@ class BoundMethod(object):
         self._mock = mock
 
     def __call__(self, *args, **kwargs):
-        return self._mock._method_invoked(Invocation(self._name, args, kwargs))
+        return self._mock.invoke(Invocation(self._name, args, kwargs))
 
 
 class Proxy(object):
-
+    """A proxy for a mock object."""
+    
     def __init__(self, mock):
         self._mock = mock
 
-    def __getattr__(self, name):
-        return BoundMethod(name, self._mock)
+    def __getattr__(self, attr_name):
+        return BoundMethod(attr_name, self._mock)
 
 
 class InvokeConflictError(Exception):
@@ -413,51 +421,56 @@ class InvokeConflictError(Exception):
 
 
 class Mock(object):
-    """Define a mock object's expectations and simple behaviour."""
+    """A mock object."""
 
     def __init__(self, name=None):
-        self.name = name
-        self._mockers = []
+        self._name = name
+        self._invokables = []
         self._proxy = Proxy(self)
         self._invocation_log = InvocationLog()
 
-    def __getattr__(self, name):
-        return BoundMethod(name, self)
+    def __getattr__(self, attr_name):
+        return BoundMethod(attr_name, self)
 
-    def _unsatisfied_mockers(self):
+    def get_name(self):
+        return self._name
+
+    # TODO remove satisfaction
+    def _unsatisfied_invokables(self):
         unsatisfied = []
-        for mocker in self._mockers:
-            if not mocker.is_satisfied():
-                unsatisfied.append(mocker)
+        for invokable in self._invokables:
+            if not invokable.is_satisfied():
+                unsatisfied.append(invokable)
         return unsatisfied
 
+    # TODO replace with a default stub that raises
     def _unmatched_method_invoked(self, invocation):
-        unsatisfied_mockers = self._unsatisfied_mockers()
+        unsatisfied_invokables = self._unsatisfied_invokables()
         raise MatchError.create_unexpected_error(invocation,
-                                                 unsatisfied_mockers)
+                                                 unsatisfied_invokables)
         
-    def _method_invoked(self, invocation):
-        matching_mocker = None
-        for mocker in self._mockers:
-            if mocker.matches(invocation):
+    def invoke(self, invocation):
+        matching_invokable = None
+        for invokable in self._invokables:
+            if invokable.matches(invocation):
                 try:
-                    return mocker.invoke()
+                    return invokable.invoke(invocation)
+                # TODO replace with exception that falls through
                 except InvokeConflictError:
-                    raise MatchError.create_conflict_error(invocation, mocker)
+                    raise MatchError.create_conflict_error(invocation,
+                                                           invokable)
         self._unmatched_method_invoked(invocation)
 
-    def _add_mocker(self, mocker):
-        self._mockers.insert(0, mocker)
+    def add_invokable(self, invokable):
+        self._invokables.insert(0, invokable)
         
     def expects(self, invocation_matcher):
         """Define a method that is expected to be called.
 
         @return: L{InvocationMocker}
         """
-        if invocation_matcher is None:
-            invocation_matcher = once()
         mocker = InvocationMocker(invocation_matcher)
-        self._add_mocker(mocker)
+        self.add_invokable(mocker)
         return NameAndDirectArgsBuilder(mocker, self._invocation_log)
 
     def stubs(self):
@@ -466,16 +479,21 @@ class Mock(object):
         @return: L{InvocationMocker}
         """
         mocker = InvocationMocker(StubInvocationMatcher())
-        self._add_mocker(mocker)
+        self.add_invokable(mocker)
         return NameAndDirectArgsBuilder(mocker, self._invocation_log)
 
     def proxy(self):
-        """Return the mock object instance.""" 
+        """Return a proxy to the mock object.
+
+        Proxies only have the mocked methods which may be useful if the
+        mock's builder methods are in the way.
+        """ 
         return self._proxy
     
+    # TODO replace with verification call on the invokables
     def verify(self):
         """Check that the mock object has been called as expected."""
-        unsatisfied = self._unsatisfied_mockers()
+        unsatisfied = self._unsatisfied_invokables()
         if len(unsatisfied) > 0:
             raise VerificationError.create_unsatisfied_error(unsatisfied)
 
@@ -492,7 +510,7 @@ class ReturnValueAction(object):
     def __str__(self):
         return "returns %s" % repr(self._value)
 
-    def invoke(self):
+    def invoke(self, invocation):
         return self._value
 
 
@@ -512,7 +530,7 @@ class RaiseExceptionAction(object):
     def __str__(self):
         return "raises %s" % self._exception
 
-    def invoke(self):
+    def invoke(self, invocation):
         raise self._exception
 
 
@@ -533,7 +551,7 @@ class AbstractInvocationMatcher(object):
     def __init__(self):
         self._invoked = False
 
-    def invoke(self):
+    def invoked(self, invocation):
         self._invoked = True
 
     
@@ -583,8 +601,8 @@ class NotCalledInvocationMatcher(AbstractInvocationMatcher):
     def __str__(self):
         return "not called"
 
-    def invoke(self):
-        AbstractInvocationMatcher.invoke(self)
+    def invoked(self, invocation):
+        AbstractInvocationMatcher.invoked(self, invocation)
         raise InvokeConflictError
 
     def is_satisfied(self):
@@ -604,7 +622,7 @@ def never():
 
 class StubInvocationMatcher(object):
 
-    def invoke(self):
+    def invoked(self, invocation):
         pass
 
     def is_satisfied(self):

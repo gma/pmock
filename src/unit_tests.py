@@ -155,20 +155,24 @@ class LeastArgumentsMatcherTest(ArgumentsMatcherTestMixin, unittest.TestCase):
         self.assertEqual(str(pmock.LeastArgumentsMatcher()), "(...)")
 
 
-class InvocationMockerMatchesTest(unittest.TestCase):
+class InvocationMockerTest(testsupport.ErrorMsgAssertsMixin,
+                           unittest.TestCase):
 
     class MockMatcher:
-        def __init__(self, matches): self._matches = matches
-        def matches(self, invocation): return self._matches
+        def __init__(self, matches):
+            self._matches = matches
+        def matches(self, invocation):
+            self.matches_invocation = invocation
+            return self._matches
+        def invoked(self, invocation):
+            self.invoked_invocation = invocation
     
     def test_matches(self):
         mocker = pmock.InvocationMocker(self.MockMatcher(True))
-        mocker.add_matcher(self.MockMatcher(True))
         self.assert_(mocker.matches(pmock.Invocation("duck", (), {})))
 
-    def test_invocation_matcher_unmatched(self):
+    def test_unmatched(self):
         mocker = pmock.InvocationMocker(self.MockMatcher(False))
-        mocker.add_matcher(self.MockMatcher(True))
         self.assert_(not mocker.matches(pmock.Invocation("duck", (), {})))
 
     def test_added_matcher_unmatched(self):
@@ -176,28 +180,41 @@ class InvocationMockerMatchesTest(unittest.TestCase):
         mocker.add_matcher(self.MockMatcher(False))
         self.assert_(not mocker.matches(pmock.Invocation("duck", (), {})))
 
+    def test_matches_passes_invocation_to_matcher(self):
+        matcher = self.MockMatcher(True)
+        mocker = pmock.InvocationMocker(matcher)
+        invocation = pmock.Invocation("duck", (), {})
+        mocker.matches(invocation)
+        self.assertEqual(matcher.matches_invocation, invocation)
 
-class InvocationMockerInvokeTest(unittest.TestCase):
-    
-    def test_invoke(self):
-        class MockInvocationMatcher:
-            def __init__(self): self.invoked = False
-            def invoke(self): self.invoked = True
+    def test_no_action_returns_none(self):
+        mocker = pmock.InvocationMocker(self.MockMatcher(True))
+        self.assert_(mocker.invoke(pmock.Invocation("duck", (), {})) is None)
+
+    def test_invoke_returns_actions_value(self):
         class MockAction:
-            def __init__(self, value): self.value = value
-            def invoke(self): return value    
-        invocation_matcher = MockInvocationMatcher()
-        mocker = pmock.InvocationMocker(invocation_matcher)
-        value = []
-        action = MockAction(value)
-        mocker.set_action(action)
-        self.assert_(mocker.invoke() is value)
+            def invoke(self, invocation): return 'value'
+        mocker = pmock.InvocationMocker(self.MockMatcher(True))
+        mocker.set_action(MockAction())
+        self.assert_(mocker.invoke(pmock.Invocation("duck", (), {})) ==
+                     'value')
+
+    # TODO: questionable functionality - why is it needed
+    def test_mocker_remembers_it_has_been_invoked(self):
+        mocker = pmock.InvocationMocker(self.MockMatcher(True))
+        self.assert_(not mocker.has_been_invoked())
+        mocker.invoke(pmock.Invocation("duck", (), {}))
         self.assert_(mocker.has_been_invoked())
-        self.assert_(invocation_matcher.invoked)
 
-
-class InvocationMockerAdditionalTest(testsupport.ErrorMsgAssertsMixin,
-                                     unittest.TestCase):
+    def test_invoke_passes_invocation_to_matcher(self):
+        matcher1 = self.MockMatcher(True)
+        matcher2 = self.MockMatcher(True)
+        mocker = pmock.InvocationMocker(matcher1)
+        mocker.add_matcher(matcher2)
+        invocation = pmock.Invocation("duck", (), {})
+        mocker.invoke(invocation)
+        self.assertEqual(matcher1.invoked_invocation, invocation)
+        self.assertEqual(matcher2.invoked_invocation, invocation)
 
     def test_satisfaction(self):
         class MockInvocationMatcher:
@@ -419,7 +436,7 @@ class AfterLabelMatcherTest(testsupport.ErrorMsgAssertsMixin,
         self.assert_(not self.matcher.matches(self.invocation))
 
     def test_invoked_matches(self):
-        self.mocker.invoke()
+        self.mocker.invoke(self.invocation)
         self.assert_(self.matcher.matches(self.invocation))
 
     def test_str(self):
@@ -445,7 +462,7 @@ class AfterLabelMatcherAdditionalTest(testsupport.ErrorMsgAssertsMixin,
         self.assertEqual(str(matcher), ".after('weasel' extra)")
 
 
-class MockInvocationTest(unittest.TestCase):
+class InvocationTest(unittest.TestCase):
 
     def test_no_args_str(self):
         self.assertEqual(str(pmock.Invocation("penguin", (), {})), "penguin()")
@@ -468,9 +485,9 @@ class MockInvocationTest(unittest.TestCase):
 
 class ProxyTest(unittest.TestCase):
 
-    def test_method_invocation(self):
+    def test_invoke(self):
         class Mock:
-            def _method_invoked(self, invocation):
+            def invoke(self, invocation):
                 self.invocation = invocation
         mock = Mock()
         proxy = pmock.Proxy(mock)
@@ -486,89 +503,89 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
         mock = pmock.Mock()
         self.assert_(mock.proxy() is mock.proxy())
 
-    def test_matching_mocker(self):
-        class Mocker:
-            def __init__(self): self.invoked = False
-            def matches(self, invocation): return True
-            def invoke(self): self.invoked = True
-        mocker = Mocker()
+    def test_unmatched_invocation(self):
         mock = pmock.Mock()
-        mock._add_mocker(mocker)
-        mock.proxy().wolf()
-        self.assert_(mocker.invoked)
-
-    def test_unmatched_method(self):
-        class Mocker:
-            def matches(self, invocation): return False
-            def is_satisfied(self): return False
-            def __str__(self): return "unsatisfied"
-        mock = pmock.Mock()
-        mock._add_mocker(Mocker())
         try:
-            mock.proxy().wolf()
+            mock.invoke(pmock.Invocation("wolf", (), {}))
             fail("should have raised due to unexpected method call")
         except pmock.MatchError, err:
             self.assertUnexpectedCallMsg(
                 err.msg,
                 str(pmock.Invocation("wolf", (), {})),
-                ["unsatisfied"])
+                [])
 
+    def test_matching_invokable(self):
+        class Invokable:
+            def matches(self, invocation):
+                self.matches_invocation = invocation
+                return True
+            def invoke(self, invocation):
+                self.invoke_invocation = invocation
+        invokable = Invokable()
+        mock = pmock.Mock()
+        mock.add_invokable(invokable)
+        invocation = pmock.Invocation("wolf", (), {})
+        mock.invoke(invocation)
+        self.assertEqual(invokable.matches_invocation, invocation)
+        self.assertEqual(invokable.invoke_invocation, invocation)
+        
     def test_lifo_matching_order(self):
-        class Mocker:
-            attempt_number = 1
-            def __init__(self, will_match):
-                self.will_match = will_match
-                self.match_attempt = None
+        class Invokable:
+            current_attempt_number = 1
+            def __init__(self, matches):
+                self._matches = matches
+                self.attempt_number = None
                 self.invoked = False
             def matches(self, invocation):
-                self.match_attempt = Mocker.attempt_number
-                Mocker.attempt_number += 1
-                return self.will_match
-            def invoke(self): self.invoked = True
-        mocker1 = Mocker(False)
-        mocker2 = Mocker(True)
-        mocker3 = Mocker(False)
+                self.attempt_number = Invokable.current_attempt_number
+                Invokable.current_attempt_number += 1
+                return self._matches
+            def invoke(self, invocation):
+                self.invoked = True
+        invokable1 = Invokable(False)
+        invokable2 = Invokable(True)
+        invokable3 = Invokable(False)
         mock = pmock.Mock()
-        mock._add_mocker(mocker1)
-        mock._add_mocker(mocker2)
-        mock._add_mocker(mocker3)
-        mock.proxy().wolf()
-        self.assert_(mocker1.match_attempt is None)
-        self.assert_(not mocker1.invoked)
-        self.assertEqual(mocker2.match_attempt, 2)
-        self.assert_(mocker2.invoked)
-        self.assertEqual(mocker3.match_attempt, 1)
-        self.assert_(not mocker3.invoked)
+        mock.add_invokable(invokable1)
+        mock.add_invokable(invokable2)
+        mock.add_invokable(invokable3)
+        mock.invoke(pmock.Invocation("wolf", (), {}))
+        self.assert_(invokable1.attempt_number is None)
+        self.assert_(not invokable1.invoked)
+        self.assertEqual(invokable2.attempt_number, 2)
+        self.assert_(invokable2.invoked)
+        self.assertEqual(invokable3.attempt_number, 1)
+        self.assert_(not invokable3.invoked)
 
-    def test_unsatisfied_mocker(self):
-        class Mocker:
+    def test_unsatisfied_invokable(self):
+        class Invokable:
             def is_satisfied(self): return False
             def __str__(self): return "unsatisfied"
         mock = pmock.Mock()
-        mock._add_mocker(Mocker())
+        mock.add_invokable(Invokable())
         try:
             mock.verify()
-            fail("should have raised due to unsatisfied mocker")
+            fail("should have raised due to unsatisfied invokable")
         except pmock.VerificationError, err:
             self.assertUnsatisfiedMsg(err.msg, ["unsatisfied"])
 
-    def test_satisfied_mocker(self):
-        class Mocker:
+    def test_satisfied_invokable(self):
+        class Invokable:
             def is_satisfied(self): return True
         mock = pmock.Mock()
-        mock._add_mocker(Mocker())
+        mock.add_invokable(Invokable())
         mock.verify()
 
-    def test_conflicting_mocker(self):
-        class Mocker:
+    def test_conflicting_invokable(self):
+        class Invokable:
             def matches(self, invocation): return True
-            def invoke(self): raise pmock.InvokeConflictError
+            def invoke(self, invocation): raise pmock.InvokeConflictError
             def __str__(self): return "conflicted"
         mock = pmock.Mock()
-        mock._add_mocker(Mocker())
+        mock.add_invokable(Invokable())
         try:
-            mock.proxy().wolf()
-            fail("should have raised due to conflicting mocker")
+            mock.invoke(pmock.Invocation("wolf", (), {}))
+            fail("should have raised due to conflicting invokable")
         except pmock.MatchError, err:
             self.assertConflictedCallMsg(
                 err.msg,
@@ -589,24 +606,24 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
 
     def test_unnamed(self):
         mock = pmock.Mock()
-        self.assertEqual(mock.name, None)
+        self.assertEqual(mock.get_name(), None)
 
     def test_name(self):
         mock = pmock.Mock("white fang")
-        self.assertEqual(mock.name, "white fang")
+        self.assertEqual(mock.get_name(), "white fang")
 
-    def test_call_directly(self):
-        class Mocker:
+    def test_invoke_directly(self):
+        class Invokable:
             def matches(self, invocation):
                 self.invocation = invocation
                 return True
-            def invoke(self): pass
+            def invoke(self, invocation): pass
         mock = pmock.Mock()
-        mocker = Mocker()
-        mock._add_mocker(mocker)
+        invokable = Invokable()
+        mock.add_invokable(invokable)
         mock.howl(under='moon')
-        self.assert_(mocker.invocation.name, "howl")
-        self.assert_(mocker.invocation.kwargs['under'], "moon")
+        self.assert_(invokable.invocation.name, "howl")
+        self.assert_(invokable.invocation.kwargs['under'], "moon")
 
 
 ##############################################################################
@@ -619,7 +636,8 @@ class ReturnValueTest(unittest.TestCase):
         self.action = pmock.ReturnValueAction("owl")
         
     def test_invoke(self):
-        self.assertEqual(self.action.invoke(), "owl")
+        self.assertEqual(self.action.invoke(pmock.Invocation("hoot", (), {})),
+                         "owl")
 
     def test_str(self):
         self.assertEqual(str(self.action), "returns 'owl'")
@@ -633,7 +651,7 @@ class RaiseExceptionAction(unittest.TestCase):
         
     def test_invoke(self):
         try:
-            self.action.invoke()
+            self.action.invoke(pmock.Invocation("hoot", (), {}))
             fail("expected exception to be raised")
         except RuntimeError, err:
             self.assertEqual(err, self.exception)
@@ -650,20 +668,20 @@ class OnceInvocationMatcherTest(unittest.TestCase):
 
     def setUp(self):
         self.matcher = pmock.OnceInvocationMatcher()
-        self.invocation = pmock.Invocation("worm", (), {})
         
     def test_uninvoked_matches(self):
-        self.assert_(self.matcher.matches(self.invocation))
+        self.assert_(self.matcher.matches(pmock.Invocation("worm", (), {})))
 
     def test_invoked_doesnt_match(self):
-        self.matcher.invoke()
-        self.assert_(not self.matcher.matches(self.invocation))
+        self.matcher.invoked(pmock.Invocation("worm", (), {}))
+        self.assert_(
+        not self.matcher.matches(pmock.Invocation("snake", (), {})))
 
     def test_uninvoked_is_unsatisfied(self):
         self.assert_(not self.matcher.is_satisfied())
 
     def test_invoked_is_satisfied(self):
-        self.matcher.invoke()
+        self.matcher.invoked(pmock.Invocation("worm", (), {}))
         self.assert_(self.matcher.is_satisfied())
 
     def test_str(self):
@@ -674,20 +692,19 @@ class AtLeastOnceInvocationMatcherTest(unittest.TestCase):
 
     def setUp(self):
         self.matcher = pmock.AtLeastOnceInvocationMatcher()
-        self.invocation = pmock.Invocation("worm", (), {})
         
     def test_uninvoked_matches(self):
-        self.assert_(self.matcher.matches(self.invocation))
+        self.assert_(self.matcher.matches(pmock.Invocation("worm", (), {})))
 
     def test_invoked_matches(self):
-        self.matcher.invoke()
-        self.assert_(self.matcher.matches(self.invocation))
+        self.matcher.invoked(pmock.Invocation("worm", (), {}))
+        self.assert_(self.matcher.matches(pmock.Invocation("snake", (), {})))
 
     def test_uninvoked_is_unsatisfied(self):
         self.assert_(not self.matcher.is_satisfied())
 
     def test_invoked_is_satisfied(self):
-        self.matcher.invoke()
+        self.matcher.invoked(pmock.Invocation("worm", (), {}))
         self.assert_(self.matcher.is_satisfied())
 
     def test_str(self):
@@ -698,20 +715,21 @@ class NotCalledInvocationMatcherTest(unittest.TestCase):
 
     def setUp(self):
         self.matcher = pmock.NotCalledInvocationMatcher()
-        self.invocation = pmock.Invocation("worm", (), {})
         
     def test_uninvoked_matches(self):
-        self.assert_(self.matcher.matches(self.invocation))
+        self.assert_(self.matcher.matches(pmock.Invocation("worm", (), {})))
 
     def test_invoke_raises(self):
-        self.assertRaises(pmock.InvokeConflictError, self.matcher.invoke)
+        self.assertRaises(pmock.InvokeConflictError,
+                          self.matcher.invoked,
+                          pmock.Invocation("worm", (), {}))
 
     def test_uninvoked_is_satisfied(self):
         self.assert_(self.matcher.is_satisfied())
 
     def test_invoked_is_unsatisfied(self):
         try:
-            self.matcher.invoke()
+            self.matcher.invoked(pmock.Invocation("worm", (), {}))
             fail()
         except pmock.InvokeConflictError:
             self.assert_(not self.matcher.is_satisfied())
@@ -724,16 +742,15 @@ class StubInvocationMatcherTest(unittest.TestCase):
 
     def setUp(self):
         self.matcher = pmock.StubInvocationMatcher()
-        self.invocation = pmock.Invocation("worm", (), {})
         
     def test_uninvoked_matches(self):
-        self.assert_(self.matcher.matches(self.invocation))
+        self.assert_(self.matcher.matches(pmock.Invocation("worm", (), {})))
 
     def test_uninvoked_is_satisfied(self):
         self.assert_(self.matcher.is_satisfied())
 
     def test_invoked_is_satisfied(self):
-        self.matcher.invoke()
+        self.matcher.invoked(pmock.Invocation("worm", (), {}))
         self.assert_(self.matcher.is_satisfied())
 
 
