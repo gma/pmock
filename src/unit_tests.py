@@ -397,7 +397,8 @@ class InvocationMockerBuilderTest(testsupport.ErrorMsgAssertsMixin,
         self.assert_(isinstance(self.mocker.added_matcher,
                                 pmock.InvokedAfterMatcher))
         self.assertEqual(str(self.mocker.added_matcher),
-                         ".after('rooster' on mock '%s')" % str(other_mock))
+                         ".after('rooster' on mock '%s')" %
+                         pmock.mock_str(other_mock))
 
     def test_match(self):
         class CustomMatcher: pass
@@ -596,7 +597,7 @@ class MockTest(unittest.TestCase):
         
     def test_get_unnamed(self):
         mock = pmock.Mock()
-        self.assertEqual(mock.get_name(), str(mock))
+        self.assertEqual(mock.get_name(), pmock.mock_str(mock))
 
     def test_get_name(self):
         mock = pmock.Mock("white fang")
@@ -612,8 +613,72 @@ class MockTest(unittest.TestCase):
         invokable = Invokable()
         mock.add_invokable(invokable)
         mock.howl(under='moon')
-        self.assert_(invokable.invocation.name, "howl")
-        self.assert_(invokable.invocation.kwargs['under'], "moon")
+        self.assertEqual(invokable.invocation.name, "howl")
+        self.assertEqual(invokable.invocation.kwargs['under'], "moon")
+
+
+class MockSpecialsTest(unittest.TestCase):
+
+    def setUp(self):
+        self.mock = pmock.Mock()
+        class Invokable:
+            def __init__(self):
+                self.returnValue = None
+            def matches(self, invocation):
+                self.invocation = invocation
+                return True
+            def invoke(self, invocation):
+                return self.returnValue
+        self.invokable = Invokable()
+        self.mock.add_invokable(self.invokable)
+        
+    def assertInvocation(self, method_name, args, kwargs):
+        self.assertEqual(self.invokable.invocation.name, method_name)
+        self.assertEqual(self.invokable.invocation.args, args)
+        self.assertEqual(self.invokable.invocation.kwargs, kwargs)
+
+    def test_special_on_proxy(self):
+        proxy = self.mock.proxy()
+        proxy("growl")
+        self.assertInvocation("__call__", ("growl",), {})
+        
+    def test_call(self):
+        self.mock("howl", bite="big")
+        self.assertInvocation("__call__", ("howl",), {"bite": "big"})
+
+    def test_cmp(self):
+        self.invokable.returnValue = 0
+        cmp(self.mock, "mouse")
+        self.assertInvocation("__cmp__", ("mouse",), {})
+
+    def test_delattr(self):
+        del self.mock.fangs
+        self.assertInvocation("__delattr__", ("fangs",), {})
+        
+    def test_hash(self):
+        self.invokable.returnValue = 0
+        hash(self.mock)
+        self.assertInvocation("__hash__", (), {})
+
+    def test_non_zero(self):
+        self.invokable.returnValue = True
+        bool(self.mock)
+        self.assertInvocation("__nonzero__", (), {})
+
+    def test_repr(self):
+        self.invokable.returnValue = "mock"
+        repr(self.mock)
+        self.assertInvocation("__repr__", (), {})
+
+    def test_str(self):
+        self.invokable.returnValue = "mock"
+        str(self.mock)
+        self.assertInvocation("__str__", (), {})
+
+    def test_unicode(self):
+        self.invokable.returnValue = "mock"
+        unicode(self.mock)
+        self.assertInvocation("__unicode__", (), {})
 
 
 class RegisterIdTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):

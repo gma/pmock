@@ -392,16 +392,6 @@ class BoundMethod(object):
         return self._mock.invoke(Invocation(self._name, args, kwargs))
 
 
-class Proxy(object):
-    """A proxy for a mock object."""
-    
-    def __init__(self, mock):
-        self._mock = mock
-
-    def __getattr__(self, attr_name):
-        return BoundMethod(attr_name, self._mock)
-
-
 class DefaultStub(object):
 
     def invoke(self, invocation):
@@ -410,7 +400,47 @@ class DefaultStub(object):
 _DEFAULT_STUB = DefaultStub()
 
 
-class Mock(object):
+def _special(method_name):
+    def mocked_special(self, *args, **kwargs):
+        return self._invoke_special(Invocation(method_name, args, kwargs))
+    return mocked_special
+
+
+class SpecialsMock(object):
+
+    __call__ = _special("__call__")
+    __cmp__ = _special("__cmp__")
+    # assume no good reason to mock __del__
+    __delattr__ = _special("__delattr__")
+    # __eq__, __ne__, etc. comparison operators covered by __cmp__
+    # __getattr__ & __getattribute__ needed for implementation
+    __hash__ = _special("__hash__")
+    # __init__ & __new__ needed for implementation
+    __nonzero__ = _special("__nonzero__")
+    __repr__ = _special("__repr__")
+    # assume no good reason to mock __setattr__
+    __str__ = _special("__str__")
+    # __unicode__ available if __str__ defined
+
+
+class Proxy(SpecialsMock):
+    """A proxy for a mock object."""
+    
+    def __init__(self, mock):
+        self._mock = mock
+
+    def __getattr__(self, attr_name):
+        return BoundMethod(attr_name, self._mock)
+
+    def _invoke_special(self, invocation):
+        return self._mock._invoke_special(invocation)
+
+
+def mock_str(mock):
+    return "<pmock.Mock id=%s>" % id(mock)
+
+
+class Mock(SpecialsMock):
     """A mock object."""
 
     def __init__(self, name=None):
@@ -427,7 +457,7 @@ class Mock(object):
         if self._name is not None:
             return self._name
         else:
-            return str(self)
+            return mock_str(self)
 
     def _get_match_order_invokables(self):
         return self._invokables[::-1] # LIFO
@@ -442,7 +472,7 @@ class Mock(object):
 
     def register_method_name(self, builder_id, builder):
         self._id_table[builder_id] = builder
-
+        
     def invoke(self, invocation):
         try:
             matching_invokable = None
@@ -453,6 +483,9 @@ class Mock(object):
         except AssertionError, err:
             raise MatchError.create_error(str(err), invocation, self)
 
+    def _invoke_special(self, invocation):
+        return self.invoke(invocation)
+            
     def add_invokable(self, invokable):
         self._invokables.append(invokable)
 
@@ -517,8 +550,8 @@ class MockTestCase(unittest.TestCase):
 
     def mock(self):
         """Create a mock object that will be automatically verified
-        after the test is run."""
-        
+        after the test is run.
+        """
         mock = Mock()
         self._mocks.append(mock)
         return mock

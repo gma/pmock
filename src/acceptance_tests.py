@@ -287,6 +287,36 @@ class MockMultipleMethodsTest(unittest.TestCase):
             pass
 
 
+class SpecialMethodsTest(pmock.MockTestCase):
+
+    def test_expected_specials(self):
+        class Test(pmock.MockTestCase):
+            def test_method(self):
+                self.special = self.mock()
+                self.special.expects(pmock.once()).__cmp__(pmock.eq("guppy")).\
+                    will(pmock.return_value(0))
+                self.special.expects(pmock.once()).__call__(pmock.eq("blub"),
+                                                            pmock.eq("blub"))
+                self.special == "guppy"
+                self.special("blub", "blub")
+        test = Test('test_method')
+        result = unittest.TestResult()
+        test(result)
+        self.assertEqual(len(result.failures), 0)
+        self.assertEqual(len(result.errors), 0)
+
+    def test_unexpected_specials(self):
+        class Test(pmock.MockTestCase):
+            def test_method(self):
+                self.special = self.mock()
+                self.special == "guppy"
+        test = Test('test_method')
+        result = unittest.TestResult()
+        test(result)
+        self.assertEqual(len(result.failures), 1)
+        self.assertEqual(len(result.errors), 0)
+
+
 class CallMockDirectlyTest(unittest.TestCase):
 
     def test_call_mock_rather_than_proxy(self):
