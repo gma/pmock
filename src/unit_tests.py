@@ -647,6 +647,73 @@ class RegisterMethodNameTest(testsupport.ErrorMsgAssertsMixin,
         self.assertEqual(self.mock.lookup_id("wolf"), another_builder)
 
 
+class MockTestCaseTest(unittest.TestCase):
+
+    def test_no_mocks_created(self):
+        class Test(pmock.MockTestCase):
+            def test_method(self):
+                pass
+        test = Test('test_method')
+        result = unittest.TestResult()
+        test.run(result)
+        self.assert_(result.wasSuccessful())
+
+    def test_created_mock(self):
+        created_mocks = []
+        class Test(pmock.MockTestCase):
+            def test_method(self):
+                created_mocks.append(self.mock())
+        test = Test('test_method')
+        result = unittest.TestResult()
+        test.run(result)
+        self.assert_(result.wasSuccessful(),
+                     'errors %s, failures %s' % (result.errors,
+                                                 result.failures))
+        self.assert_(isinstance(created_mocks[0], pmock.Mock))
+
+    def test_created_mocks_are_verified(self):
+        class MockMatcher:
+            def verify(self): self.is_verified = True
+        matcher = MockMatcher()
+        class Test(pmock.MockTestCase):
+            def test_method(self):
+                self.mock().expects(matcher)
+        test = Test('test_method')
+        test.run()
+        self.assert_(matcher.is_verified)
+
+    def test_raised_verify_is_failure(self):
+        class MockMatcher:
+            def verify(self): raise pmock.VerificationError('oops')
+        matcher = MockMatcher()
+        class Test(pmock.MockTestCase):
+            def test_method(self):
+                self.mock().expects(matcher)
+        test = Test('test_method')
+        result = unittest.TestResult()
+        test.run(result)
+        self.assertEqual(len(result.failures), 1)
+        self.assertEqual(len(result.errors), 0)
+
+    def test_auto_verify_independent_of_fixtures(self):
+        fixtures = []
+        class MockMatcher:
+            def verify(self): self.is_verified = True
+        matcher = MockMatcher()
+        class Test(pmock.MockTestCase):
+            def setUp(self):
+                fixtures.append('setUp')
+            def tearDown(self):
+                fixtures.append('tearDown')
+            def test_method(self):
+                self.mock().expects(matcher)
+        test = Test('test_method')
+        result = unittest.TestResult()
+        test.run()
+        self.assert_(matcher.is_verified)
+        self.assertEqual(fixtures, ['setUp', 'tearDown'])
+
+
 ##############################################################################
 # Mocked method actions
 ############################################################################## 

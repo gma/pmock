@@ -531,5 +531,33 @@ class ErrorMessageTest(unittest.TestCase):
                              "expected not to be called: cockroach()")
 
 
+class MockTestCaseTest(unittest.TestCase):
+
+    def test_verify_unsatisfied_expectation(self):
+        class Test(pmock.MockTestCase):
+            def test_method(self):
+                mock = self.mock()
+                mock.expects(pmock.once()).crow()
+        test = Test('test_method')
+        result = unittest.TestResult()
+        test.run(result)
+        self.assertEqual(len(result.failures), 1)
+        self.assertEqual(len(result.errors), 0)
+        traceback = result.failures[0][1]
+        self.assert_(traceback.find('VerificationError') != -1)
+
+    def test_verify_satisfied_expectation(self):
+        class Test(pmock.MockTestCase):
+            def test_method(self):
+                mock = self.mock()
+                mock.expects(pmock.once()).crow()
+                mock.crow()
+        test = Test('test_method')
+        result = unittest.TestResult()
+        test.run(result)
+        self.assertEqual(len(result.failures), 0)
+        self.assertEqual(len(result.errors), 0)
+
+
 if __name__ == '__main__':
     unittest.main()

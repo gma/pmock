@@ -46,12 +46,13 @@ __author__ = "Graham Carlyle"
 __email__ = "grahamcarlyle at users dot sourceforge dot net"
 __version__ = "0.3"
 
+import unittest
 
 ##############################################################################
 # Exported classes and functions
 ##############################################################################
 
-__all__ = ["Mock",
+__all__ = ["Mock", "MockTestCase",
            "once", "at_least_once", "never",
            "eq", "same", "string_contains", "functor",
            "return_value", "raise_exception"]
@@ -469,6 +470,31 @@ class Mock(object):
         """Check that the mock object has been called as expected."""
         for invokable in self._get_match_order_invokables():
             invokable.verify()
+
+
+class MockTestCase(unittest.TestCase):
+
+    def __init__(self, methodName='runTest'):
+        unittest.TestCase.__init__(self, methodName)
+        self._test_method_name = methodName
+        self._mocks = []
+        
+    def _auto_verified_test(self):
+        self._real_test_method()
+        for mock in self._mocks:
+            mock.verify()
+    
+    def run(self, result=None):
+        self._mocks = []
+        self._real_test_method = getattr(self, self._test_method_name)
+        setattr(self, self._test_method_name, self._auto_verified_test)
+        unittest.TestCase.run(self, result)
+        setattr(self, self._test_method_name, self._real_test_method)
+
+    def mock(self):
+        mock = Mock()
+        self._mocks.append(mock)
+        return mock
 
 
 ##############################################################################

@@ -28,32 +28,29 @@ class Greeting:
             return "Good day"
 
 
-class GreetingTest(unittest.TestCase):
+class GreetingTest(MockTestCase):
 
     def setUp(self):
-        self.mock = Mock()
-        self.greeting = Greeting(self.mock)
-
-    def tearDown(self):
-        self.mock.verify()
+        self.system = self.mock()
+        self.greeting = Greeting(self.system)
 
     def test_afternoon(self):
-        self.mock.expects(once()).time().will(return_value((12,10)))
+        self.system.expects(once()).time().will(return_value((12,10)))
         self.assertEqual(self.greeting.message(), "Good afternoon")
 
     def test_morning(self):
-        self.mock.expects(once()).time().will(return_value((6,50)))
+        self.system.expects(once()).time().will(return_value((6,50)))
         self.assertEqual(self.greeting.message(), "Good morning")
 
     def test_evening(self):
-        self.mock.expects(once()).time().will(return_value((19,50)))
+        self.system.expects(once()).time().will(return_value((19,50)))
         self.assertEqual(self.greeting.message(), "Good evening")
 
     def test_clock_failure(self):
         err_msg = "bzzz..malfunction"
         err = SystemError(err_msg)
-        self.mock.expects(once()).time().will(raise_exception(err))
-        self.mock.expects(once()).log(string_contains(err_msg))
+        self.system.expects(once()).time().will(raise_exception(err))
+        self.system.expects(once()).log(string_contains(err_msg))
         self.assertEqual(self.greeting.message(), "Good day")
 
 

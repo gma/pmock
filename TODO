@@ -1,6 +1,5 @@
 todo:
 + default stub behaviour
-+ TestCase base class for autoverification of mocks in test case.
 + change from GPL to python license
 + PyPI registration 
 + constrain allowable order of builder methods
