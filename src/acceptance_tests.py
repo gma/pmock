@@ -380,7 +380,7 @@ class OrderedCallsBasicTest(unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expects(pmock.once()).method("bull").label("bull call")
+        self.mock.expects(pmock.once()).method("bull").id("bull call")
         self.mock.expects(pmock.once()).method("cow").after("bull call")
 
     def test_call_in_order(self):
@@ -401,7 +401,7 @@ class OrderedCallsAcrossMocksTest(unittest.TestCase):
     def setUp(self):
         self.mock1 = pmock.Mock("field")
         self.mock2 = pmock.Mock()
-        self.mock1.expects(pmock.once()).method("bull").label("bovine")
+        self.mock1.expects(pmock.once()).method("bull").id("bovine")
         self.mock2.expects(pmock.once()).method("cow").after("bovine",
                                                              self.mock1)
 
@@ -425,14 +425,14 @@ class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
     def setUp(self):
         self.mock = pmock.Mock()
 
-    def test_method_name_as_label(self):
+    def test_method_name_as_id(self):
         self.mock.expects(pmock.once()).method("bull")
         self.mock.expects(pmock.once()).method("cow").after("bull")
         self.mock.proxy().bull()
         self.mock.proxy().cow()
         self.mock.verify()
 
-    def test_method_name_as_label_binds_to_last_matching_expectation(self):
+    def test_method_name_as_id_binds_to_last_matching_expectation(self):
         self.mock.expects(pmock.once()).method("cow").with(pmock.eq("moo"))
         self.mock.expects(pmock.once()).method("cow").with(pmock.eq("mooo"))
         self.mock.expects(pmock.once()).method("bull").after("cow")
@@ -441,29 +441,28 @@ class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
         self.mock.proxy().cow("moo")
         self.mock.verify()
 
-    def test_after_undefined_label_raises(self):
+    def test_after_undefined_id_raises(self):
         try:
             self.mock.expects(pmock.once()).method("cow").after("ox")
             self.fail()
         except pmock.DefinitionError, err:
-            self.assertUndefinedLabelMsg(err.msg, "ox")
+            self.assertUndefinedIdMsg(err.msg, "ox")
 
-    def test_disallow_duplicate_labels(self):
-        self.mock.expects(pmock.once()).method("cow").label("bovine")
+    def test_disallow_duplicate_ids(self):
+        self.mock.expects(pmock.once()).method("cow").id("bovine")
         try:
-            self.mock.expects(pmock.once()).method("bull").label("bovine")
+            self.mock.expects(pmock.once()).method("bull").id("bovine")
             self.fail()
         except pmock.DefinitionError, err:
-            self.assertDuplicateLabelMsg(err.msg, "bovine",
-                                         "expected once: cow [bovine]")
+            self.assertDuplicateIdMsg(err.msg, "bovine")
 
-    def test_disallow_duplicating_label_of_existing_method(self):
+    def test_disallow_duplicating_id_of_existing_method(self):
         self.mock.expects(pmock.once()).method("cow")
         try:
-            self.mock.expects(pmock.once()).method("bovine").label("cow")
+            self.mock.expects(pmock.once()).method("bovine").id("cow")
             self.fail()
         except pmock.DefinitionError, err:
-            self.assertDuplicateLabelMsg(err.msg, "cow", "expected once: cow")
+            self.assertDuplicateIdMsg(err.msg, "cow")
 
 
 class StubTest(unittest.TestCase):

@@ -1,12 +1,10 @@
 todo:
-+ refactor AfterLabelMatcher to use matcher added to InvocationMocker to determine whether mocker was called
 + default stub behaviour
 + TestCase base class for autoverification of mocks in test case.
 + change from GPL to python license
 + PyPI registration 
 + constrain allowable order of builder methods
 + add constraints and(), not(), or()
-+ rename label method back to id
 + build scripts in CVS (Scons?)
 
 possibly:

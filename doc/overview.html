@@ -100,11 +100,11 @@ The order of calls to the mock object can be described with the <code>after</cod
     mock.expects(pmock.once()).render().after("invalidate")
 </pre>
 
-<p>An explicit label can be set for an expectation and used in the <code>after</code> method instead of using the method name.
+<p>An explicit id can be set for an expectation and used in the <code>after</code> method instead of using the method name.
 
 <pre>
-    mock.expects(pmock.once()).add(pmock.eq(10)).label("add #1")
-    mock.expects(pmock.once()).add(pmock.eq(15)).label("add #2").after("add #1")
+    mock.expects(pmock.once()).add(pmock.eq(10)).id("add #1")
+    mock.expects(pmock.once()).add(pmock.eq(15)).id("add #2").after("add #1")
     mock.expects(pmock.once()).add(pmock.eq(5)).after("add #2")
 </pre>
 

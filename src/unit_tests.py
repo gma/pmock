@@ -197,13 +197,6 @@ class InvocationMockerTest(unittest.TestCase):
         self.assert_(mocker.invoke(pmock.Invocation("duck", (), {})) ==
                      'value')
 
-    # TODO: remove when AfterLabelMatcher refactored
-    def test_mocker_remembers_it_has_been_invoked(self):
-        mocker = pmock.InvocationMocker(self.MockMatcher(True))
-        self.assert_(not mocker.has_been_invoked())
-        mocker.invoke(pmock.Invocation("duck", (), {}))
-        self.assert_(mocker.has_been_invoked())
-
     def test_invoke_passes_invocation_to_matcher(self):
         matcher1 = self.MockMatcher(True)
         matcher2 = self.MockMatcher(True)
@@ -254,7 +247,7 @@ class InvocationMockerTest(unittest.TestCase):
                          "invocation_matcher: added_matcher1added_matcher2, "
                          "action")
 
-    def test_implicitly_labelled_str(self):
+    def test_no_id_str(self):
         class MockMatcher:
             def __init__(self, str_str): self._str = str_str
             def __str__(self): return self._str
@@ -262,7 +255,7 @@ class InvocationMockerTest(unittest.TestCase):
         mocker.add_matcher(MockMatcher("added_matcher1"))
         self.assertEqual(str(mocker), "invocation_matcher: added_matcher1")
 
-    def test_explicitly_labelled_str(self):
+    def test_id_str(self):
         class MockMatcher:
             def __init__(self, str_str): self._str = str_str
             def __str__(self): return self._str
@@ -270,30 +263,68 @@ class InvocationMockerTest(unittest.TestCase):
         mocker = pmock.InvocationMocker(MockMatcher("invocation_matcher"))
         mocker.add_matcher(MockMatcher("added_matcher1"))
         mocker.set_action(MockAction("action"))
-        mocker.set_label("quack")
+        mocker.set_id("quack")
         self.assertEqual(str(mocker),
                          "invocation_matcher: added_matcher1, action [quack]")
 
 
-class MatchBuilderTest(testsupport.ErrorMsgAssertsMixin,
-                       unittest.TestCase):
+class InvocationMockerBuilderTest(testsupport.ErrorMsgAssertsMixin,
+                                  unittest.TestCase):
+
+    class MockInvocationMocker:
+        def __init__(self):
+            self.added_matchers = []
+            self.id = None
+            self.action = None
+        def add_matcher(self, matcher):
+            self.added_matchers.append(matcher)
+        def set_id(self, mocker_id):
+            self.id = mocker_id
+        def set_action(self, action):
+            self.action = action
+        def _get_only_added_matcher(self):
+            if len(self.added_matchers) != 1:
+                raise AssertionError('more than one matcher has been added')
+            return self.added_matchers[0]
+        added_matcher = property(_get_only_added_matcher)
 
     def setUp(self):
-        class MockInvocationMocker:
-            def __init__(self):
-                self.added_matcher = None
-                self.label = None
-                self.action = None
-            def add_matcher(self, matcher):
-                self.added_matcher = matcher
-            def set_label(self, label):
-                self.label = label
-            def set_action(self, action):
-                self.action = action
-        self.mocker = MockInvocationMocker()
-        self.invocation_log = pmock.InvocationLog()
-        self.builder = pmock.MatchBuilder(self.mocker, self.invocation_log)
-        
+        self.mocker = self.MockInvocationMocker()
+        self.builder_namespace = pmock.Mock()
+        self.builder = pmock.InvocationMockerBuilder(self.mocker,
+                                                     self.builder_namespace)
+
+    def test_add_method_matcher(self):
+        self.assert_(self.builder.method("chicken") is not None)
+        self.assert_(isinstance(self.mocker.added_matcher,
+                                pmock.MethodMatcher))
+        self.assert_(self.mocker.added_matcher.matches(
+            pmock.Invocation("chicken", (), {})))
+        self.assertEqual(self.builder_namespace.lookup_id("chicken"),
+                         self.builder)
+
+    def test_add_direct_method_matcher(self):
+        self.assert_(self.builder.chicken() is not None)
+        self.assert_(isinstance(self.mocker.added_matchers[0],
+                                pmock.MethodMatcher))
+        self.assert_(self.mocker.added_matchers[0].matches(
+            pmock.Invocation("chicken", (), {})))
+        self.assert_(self.mocker.added_matchers[1].matches(
+            pmock.Invocation("chicken", (), {})))
+        self.assertEqual(self.builder_namespace.lookup_id("chicken"),
+                         self.builder)
+
+    def test_add_direct_method_and_arg_matcher(self):
+        self.assert_(self.builder.chicken(pmock.eq("egg")) is not None)
+        self.assert_(isinstance(self.mocker.added_matchers[0],
+                                pmock.MethodMatcher))
+        self.assert_(self.mocker.added_matchers[0].matches(
+            pmock.Invocation("chicken", (), {})))
+        self.assert_(self.mocker.added_matchers[1].matches(
+            pmock.Invocation("chicken", ("egg",), {})))
+        self.assertEqual(self.builder_namespace.lookup_id("chicken"),
+                         self.builder)
+
     def test_add_with_matcher(self):
         self.assert_(self.builder.with(pmock.eq("egg")) is not None)
         self.assert_(isinstance(self.mocker.added_matcher,
@@ -322,32 +353,40 @@ class MatchBuilderTest(testsupport.ErrorMsgAssertsMixin,
         self.assert_(self.builder.will(action) is not None)
         self.assertEqual(self.mocker.action, action)
 
-    def test_set_label(self):
-        self.assert_(self.builder.label("poultry") is not None)
-        self.assertEqual(self.mocker.label, "poultry")
-        self.assertEqual(self.invocation_log.get_registered("poultry"),
-                         self.mocker)
+    def test_set_id(self):
+        self.assert_(self.builder.id("poultry") is not None)
+        self.assertEqual(self.mocker.id, "poultry")
+        self.assertEqual(self.builder_namespace.lookup_id("poultry"),
+                         self.builder)
 
-    def test_set_duplicate_label(self):
-        self.builder.label("poultry")
+    def test_set_duplicate_id(self):
+        self.builder.id("poultry")
         try:
-            self.builder.label("poultry")
-            self.fail("mocker with duplicate labels should raise")
+            self.builder.id("poultry")
+            self.fail("mocker with duplicate ids should raise")
         except pmock.DefinitionError, err:
-            self.assertDuplicateLabelMsg(err.msg, "poultry", str(self.mocker))
+            self.assertDuplicateIdMsg(err.msg, "poultry")
         
     def test_add_after_ordering(self):
-        self.builder.label("rooster")
+        builder2 = pmock.InvocationMockerBuilder(self.MockInvocationMocker(),
+                                                 self.builder_namespace)
+        builder2.id("rooster")
         self.assert_(self.builder.after("rooster") is not None)
         self.assert_(isinstance(self.mocker.added_matcher,
-                                pmock.AfterLabelMatcher))
+                                pmock.InvokedAfterMatcher))
+
+    def test_after_undefined_id(self):
+        try:
+            self.builder.after("rooster")
+        except pmock.DefinitionError, err:
+            self.assertUndefinedIdMsg(err.msg, "rooster")
 
     def test_add_after_other_named_mock_ordering(self):
         other_mock = pmock.Mock("coup")
         other_mock.expects(pmock.OnceInvocationMatcher()).method("rooster")
         self.assert_(self.builder.after("rooster", other_mock) is not None)
         self.assert_(isinstance(self.mocker.added_matcher,
-                                pmock.AfterLabelMatcher))
+                                pmock.InvokedAfterMatcher))
         self.assertEqual(str(self.mocker.added_matcher),
                          ".after('rooster' on mock 'coup')")
 
@@ -356,54 +395,15 @@ class MatchBuilderTest(testsupport.ErrorMsgAssertsMixin,
         other_mock.expects(pmock.OnceInvocationMatcher()).method("rooster")
         self.assert_(self.builder.after("rooster", other_mock) is not None)
         self.assert_(isinstance(self.mocker.added_matcher,
-                                pmock.AfterLabelMatcher))
+                                pmock.InvokedAfterMatcher))
         self.assertEqual(str(self.mocker.added_matcher),
-                         ".after('rooster' on mock %s)" % str(other_mock))
+                         ".after('rooster' on mock '%s')" % str(other_mock))
 
-
-class NameAndDirectArgsBuilderTest(unittest.TestCase):
-
-    def setUp(self):
-        class MockInvocationMocker:
-            def __init__(self):
-                self.added_matchers = []
-            def add_matcher(self, matcher):
-                self.added_matchers.append(matcher)
-        self.mocker = MockInvocationMocker()
-        self.invocation_log = pmock.InvocationLog()
-        self.builder = pmock.NameAndDirectArgsBuilder(self.mocker,
-                                                      self.invocation_log)
-
-    def test_add_method_matcher(self):
-        self.assert_(self.builder.method("chicken") is not None)
-        self.assert_(isinstance(self.mocker.added_matchers[0],
-                                pmock.MethodMatcher))
-        self.assert_(self.mocker.added_matchers[0].matches(
-            pmock.Invocation("chicken", (), {})))
-        self.assertEqual(self.invocation_log.get_registered("chicken"),
-                         self.mocker)
-
-    def test_add_direct_method_matcher(self):
-        self.assert_(self.builder.chicken() is not None)
-        self.assert_(isinstance(self.mocker.added_matchers[0],
-                                pmock.MethodMatcher))
-        self.assert_(self.mocker.added_matchers[0].matches(
-            pmock.Invocation("chicken", (), {})))
-        self.assert_(self.mocker.added_matchers[1].matches(
-            pmock.Invocation("chicken", (), {})))
-        self.assertEqual(self.invocation_log.get_registered("chicken"),
-                         self.mocker)
-
-    def test_add_direct_method_and_arg_matcher(self):
-        self.assert_(self.builder.chicken(pmock.eq("egg")) is not None)
-        self.assert_(isinstance(self.mocker.added_matchers[0],
-                                pmock.MethodMatcher))
-        self.assert_(self.mocker.added_matchers[0].matches(
-            pmock.Invocation("chicken", (), {})))
-        self.assert_(self.mocker.added_matchers[1].matches(
-            pmock.Invocation("chicken", ("egg",), {})))
-        self.assertEqual(self.invocation_log.get_registered("chicken"),
-                         self.mocker)
+    def test_match(self):
+        class CustomMatcher: pass
+        custom_matcher = CustomMatcher()
+        self.assert_(self.builder.match(custom_matcher) is not None)
+        self.assertEqual(self.mocker.added_matcher, custom_matcher)
 
 
 class MethodMatcherTest(unittest.TestCase):
@@ -423,58 +423,23 @@ class MethodMatcherTest(unittest.TestCase):
         self.assertEqual(str(self.method_matcher), "horse")
 
 
-class InvocationLogTest(unittest.TestCase):
+class InvokedAfterMatcherTest(unittest.TestCase):
 
     def setUp(self):
-        self.invocation_log = pmock.InvocationLog()
-
-    def test_not_registered(self):
-        self.assert_(not self.invocation_log.is_registered("racoon"))
-
-    def test_registered(self):
-        mocker = pmock.InvocationMocker(pmock.OnceInvocationMatcher())
-        self.invocation_log.register("racoon", mocker)
-        self.assert_(self.invocation_log.is_registered("racoon"))
-        self.assertEqual(self.invocation_log.get_registered("racoon"), mocker)
-
-
-class AfterLabelMatcherTest(unittest.TestCase):
-
-    def setUp(self):
-        self.invocation_log = pmock.InvocationLog()
-        self.mocker = pmock.InvocationMocker(pmock.OnceInvocationMatcher())
-        self.invocation_log.register("weasel", self.mocker)
-        self.matcher = pmock.AfterLabelMatcher("weasel", self.invocation_log)
+        self.invocation_recorder = pmock.InvokedRecorderMatcher()
+        self.matcher = pmock.InvokedAfterMatcher(self.invocation_recorder,
+                                                 "'weasel'")
         self.invocation = pmock.Invocation("stoat", (), {})
         
     def test_uninvoked_doesnt_match(self):
         self.assert_(not self.matcher.matches(self.invocation))
 
     def test_invoked_matches(self):
-        self.mocker.invoke(self.invocation)
+        self.invocation_recorder.invoked(self.invocation)
         self.assert_(self.matcher.matches(self.invocation))
 
     def test_str(self):
         self.assertEqual(str(self.matcher), ".after('weasel')")
-
-
-class AfterLabelMatcherAdditionalTest(testsupport.ErrorMsgAssertsMixin,
-                                      unittest.TestCase):
-
-    def test_unregistered_label(self):
-        try:
-            invocation_log = pmock.InvocationLog()
-            matcher = pmock.AfterLabelMatcher("stoat", invocation_log)
-            self.fail("should raise because label isn't registered")
-        except pmock.DefinitionError, err:
-            self.assertUndefinedLabelMsg(err.msg, "stoat")
-
-    def test_str_with_additional_description(self):
-        invocation_log = pmock.InvocationLog()
-        mocker = pmock.InvocationMocker(pmock.OnceInvocationMatcher())
-        invocation_log.register("weasel", mocker)
-        matcher = pmock.AfterLabelMatcher("weasel", invocation_log, " extra")
-        self.assertEqual(str(matcher), ".after('weasel' extra)")
 
 
 class InvocationTest(unittest.TestCase):
@@ -611,20 +576,20 @@ class MockTest(unittest.TestCase):
     def test_expects(self):
         mock = pmock.Mock()
         mock.expects(pmock.OnceInvocationMatcher()).method("foo")
-        self.assert_(mock._invocation_log.is_registered("foo"))
+        self.assert_(mock.lookup_id("foo") is not None)
         self.assertRaises(pmock.VerificationError, mock.verify)
 
     def test_stubs(self):
         mock = pmock.Mock()
         mock.stubs().method("foo")
-        self.assert_(mock._invocation_log.is_registered("foo"))
+        self.assert_(mock.lookup_id("foo") is not None)
         mock.verify()
 
-    def test_unnamed(self):
+    def test_get_unnamed(self):
         mock = pmock.Mock()
-        self.assertEqual(mock.get_name(), None)
+        self.assertEqual(mock.get_name(), str(mock))
 
-    def test_name(self):
+    def test_get_name(self):
         mock = pmock.Mock("white fang")
         self.assertEqual(mock.get_name(), "white fang")
 
@@ -640,6 +605,46 @@ class MockTest(unittest.TestCase):
         mock.howl(under='moon')
         self.assert_(invokable.invocation.name, "howl")
         self.assert_(invokable.invocation.kwargs['under'], "moon")
+
+
+class RegisterIdTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
+    
+    def setUp(self):
+        class MockBuilder: pass
+        self.builder = MockBuilder()
+        self.mock = pmock.Mock()
+        self.mock.register_unique_id("howler", self.builder)
+
+    def test_register_unique_id(self):
+        self.assertEqual(self.mock.lookup_id("howler"), self.builder)
+
+    def test_register_duplicate_id(self):
+        try:
+            self.mock.register_unique_id("howler", self.builder)
+        except pmock.DefinitionError, err:
+            self.assertDuplicateIdMsg(err.msg, "howler")
+
+    def test_lookup_unknown_id(self):
+        self.assert_(self.mock.lookup_id("growler") is None)
+
+
+class RegisterMethodNameTest(testsupport.ErrorMsgAssertsMixin,
+                             unittest.TestCase):
+
+    class MockBuilder: pass
+    
+    def setUp(self):
+        self.builder = self.MockBuilder()
+        self.mock = pmock.Mock()
+        self.mock.register_method_name("wolf", self.builder)
+
+    def test_register_method_name(self):
+        self.assertEqual(self.mock.lookup_id("wolf"), self.builder)
+
+    def test_register_method_again(self):
+        another_builder = self.MockBuilder()
+        self.mock.register_method_name("wolf", another_builder)
+        self.assertEqual(self.mock.lookup_id("wolf"), another_builder)
 
 
 ##############################################################################
