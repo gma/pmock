@@ -15,6 +15,7 @@
 <li><a href="#CallOrderExpectations">Call order expectations<a/></li>
 <li><a href="#MockBehaviour">Mock behaviour<a/></li>
 <li><a href="#Stubs">Stubs<a/></li>
+<li><a href="#DefaultBehaviourForUndefinedMethods">Default behaviour for undefined methods<a/></li>
 <li><a href="#FromImports"><code>from</code> imports<a/></li>
 <li><a href="#TestBaseClass">Test base class<a/></li>
 <li><a href="#FurtherInformation">Further information<a/></li>
@@ -134,6 +135,15 @@ Stubs allow behaviours to be specified for methods that can be called any number
 
 <pre>
     mock.stubs().sleep().will(pmock.return_value(True))
+</pre>
+
+<h2 id="DefaultBehaviourForUndefinedMethods">Default behaviour for undefined methods</h2>
+
+When an undefined method is called an exception is normally raised. However this behviour can be overridden by supplying a stub object to the <code>Mock</code> instance's <code>set_default_stub</code> method.
+
+<pre>
+    mock.set_default_stub(pmock.return_value("legs"))
+    mock.crazy()
 </pre>
 
 <h2 id="FromImports">From imports</h2>

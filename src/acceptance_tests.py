@@ -474,9 +474,9 @@ class StubTest(unittest.TestCase):
         mock.stubs().method("fox").with("sly", meal="chicken")
         mock.stubs().method("fox").will(pmock.return_value("trot"))
         self.assertEqual(mock.proxy().fox(), "trot")
-        mock.proxy().fox("sly", meal="chicken")
-        mock.proxy().fox("sly")
-        mock.proxy().fox()
+        mock.fox("sly", meal="chicken")
+        mock.fox("sly")
+        mock.fox()
 
     def test_uninvoked_doesnt_raise_verify(self):
         mock = pmock.Mock()
@@ -487,8 +487,13 @@ class StubTest(unittest.TestCase):
         mock = pmock.Mock()
         mock.stubs().method("fox")
         mock.expects(pmock.once()).method("farmer").after("fox")
-        mock.proxy().fox()
-        mock.proxy().farmer()
+        mock.fox()
+        mock.farmer()
+
+    def test_set_default_stub(self):
+        mock = pmock.Mock()
+        mock.set_default_stub(pmock.return_value("trot"))
+        self.assertEqual(mock.fox(), "trot")
 
 
 class ErrorMessageTest(unittest.TestCase):

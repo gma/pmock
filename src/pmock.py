@@ -390,6 +390,14 @@ class Proxy(object):
         return BoundMethod(attr_name, self._mock)
 
 
+class DefaultStub(object):
+
+    def invoke(self, invocation):
+        raise AssertionError("no match found")
+
+_DEFAULT_STUB = DefaultStub()
+
+
 class Mock(object):
     """A mock object."""
 
@@ -397,6 +405,7 @@ class Mock(object):
         self._name = name
         self._invokables = []
         self._proxy = Proxy(self)
+        self._default_stub = _DEFAULT_STUB
         self._id_table = {}
 
     def __getattr__(self, attr_name):
@@ -428,8 +437,7 @@ class Mock(object):
             for invokable in self._get_match_order_invokables():
                 if invokable.matches(invocation):
                     return invokable.invoke(invocation)
-            # TODO replace with default stub
-            raise AssertionError("no match found")
+            return self._default_stub.invoke(invocation)
         except AssertionError, err:
             raise MatchError.create_error(str(err), invocation, self)
 
@@ -458,6 +466,10 @@ class Mock(object):
         self.add_invokable(mocker)
         return InvocationMockerBuilder(mocker, self)
 
+    def set_default_stub(self, stub):
+        """Set the default behaviour of undefined methods."""
+        self._default_stub = stub
+        
     def proxy(self):
         """Return a proxy to the mock object.
 

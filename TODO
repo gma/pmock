@@ -1,5 +1,4 @@
 todo:
-+ default stub behaviour
 + change from GPL to python license
 + PyPI registration 
 + constrain allowable order of builder methods

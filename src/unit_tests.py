@@ -575,16 +575,25 @@ class MockTest(unittest.TestCase):
         
     def test_expects(self):
         mock = pmock.Mock()
-        mock.expects(pmock.OnceInvocationMatcher()).method("foo")
-        self.assert_(mock.lookup_id("foo") is not None)
+        mock.expects(pmock.OnceInvocationMatcher()).method("howl")
+        self.assert_(mock.lookup_id("howl") is not None)
         self.assertRaises(pmock.VerificationError, mock.verify)
 
     def test_stubs(self):
         mock = pmock.Mock()
-        mock.stubs().method("foo")
-        self.assert_(mock.lookup_id("foo") is not None)
+        mock.stubs().method("growl")
+        self.assert_(mock.lookup_id("growl") is not None)
         mock.verify()
 
+    def test_set_default_stub(self):
+        class Stub:
+            def invoke(self, invocation):
+                return "bark"
+        stub = Stub()
+        mock = pmock.Mock()
+        mock.set_default_stub(stub)
+        self.assertEquals(mock.foo(), "bark")
+        
     def test_get_unnamed(self):
         mock = pmock.Mock()
         self.assertEqual(mock.get_name(), str(mock))
