@@ -208,12 +208,7 @@ class MockMethodWithAtLeastKeywordArgTest(MockMethodKeywordArgTestMixin,
         self.mock.verify()
 
 
-class MockMethodWithNoArgsTest(testsupport.ErrorMsgAssertsMixin,
-                               unittest.TestCase):
-
-    def setUp(self):
-        self.mock = pmock.Mock()
-        self.mock.expects(pmock.once()).method("dog").no_args()
+class MockMethodWithNoArgsTestMixin(object):
 
     def test_method_with_no_args(self):
         self.mock.proxy().dog()
@@ -234,6 +229,14 @@ class MockMethodWithNoArgsTest(testsupport.ErrorMsgAssertsMixin,
         except pmock.MatchError, err:
             self.assertUnexpectedCallMsg(err.msg, "dog(toy='ball')",
                                          ["once dog()"])
+
+class MockMethodWithNoArgsTest(testsupport.ErrorMsgAssertsMixin,
+                               MockMethodWithNoArgsTestMixin,
+                               unittest.TestCase):
+
+    def setUp(self):
+        self.mock = pmock.Mock()
+        self.mock.expects(pmock.once()).method("dog").no_args()
 
 
 class MockMethodWithAnyArgsTest(testsupport.ErrorMsgAssertsMixin,
@@ -286,6 +289,25 @@ class MockMethodWillTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
             self.assertUnsatisfiedMsg(err.msg, ["once dog, returns 'bone'"])
 
 
+class MockDirectMethodWithNoArgsTest(testsupport.ErrorMsgAssertsMixin,
+                                     MockMethodWithNoArgsTestMixin,
+                                     unittest.TestCase):
+    
+    def setUp(self):
+        self.mock = pmock.Mock()
+        self.mock.expects(pmock.once()).dog()
+
+
+class MockDirectMethodAdditionalTest(unittest.TestCase):
+
+    def test_expectation(self):
+        mock = pmock.Mock()
+        mock.expects(pmock.once()).dog(pmock.eq("bone"),
+                                       food=pmock.eq("biscuit")).will(
+            pmock.return_value("bark"))
+        self.assert_(mock.proxy().dog("bone", food="biscuit"), "bark")
+            
+    
 class MockMultipleMethodsTest(testsupport.ErrorMsgAssertsMixin,
                               unittest.TestCase):
 
@@ -306,6 +328,15 @@ class MockMultipleMethodsTest(testsupport.ErrorMsgAssertsMixin,
             self.fail()
         except pmock.VerificationError, err:
             self.assertUnsatisfiedMsg(err.msg, ["once cat(pmock.eq('mouse'))"])
+
+
+class CallMockDirectlyTest(unittest.TestCase):
+
+    def test_call_mock_rather_than_proxy(self):
+        self.mock = pmock.Mock()
+        self.mock.expects(pmock.once()).method("newt")
+        self.mock.newt()
+        self.mock.verify()
 
 
 class FifoExpectationTest(testsupport.ErrorMsgAssertsMixin,

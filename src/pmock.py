@@ -5,7 +5,7 @@ framework.
 This module provides support for creating mock objects for use in unit
 testing. The api is modelled on the jmock mock object framework.
 
-Usage::
+Usage:
 
     import pmock
     import unittest
@@ -20,15 +20,15 @@ Usage::
     class PowerStationTestCase(unittest.TestCase):
         def test_successful_activation(self):
             mock = pmock.Mock()
-            mock.expects().method('activate').with(pmock.eq('core'))
-            PowerStation().start_up(mock.proxy())
+            mock.expects(pmock.once()).activate(pmock.eq('core'))
+            PowerStation().start_up(mock)
             mock.verify()
         def test_problematic_activation(self):
             mock = pmock.Mock()
-            mock.expects().method('activate').with(pmock.eq('core')).will(
+            mock.expects(pmock.once()).activate(pmock.eq('core')).will(
                 pmock.throw_exception(RuntimeError('overheating')))
-            mock.expects().method('shutdown')
-            PowerStation().start_up(mock.proxy())
+            mock.expects(pmock.once()).shutdown()
+            PowerStation().start_up(mock)
             mock.verify()
 
     if __name__ == '__main__':
@@ -298,13 +298,10 @@ class InvocationMockerBuilder(object):
     def __init__(self, mocker, invocation_log):
         self._mocker = mocker
         self._invocation_log = invocation_log
-        
-    def method(self, name):
-        """Define method name."""
-        self._mocker.add_matcher(MethodMatcher(name))
-        self._invocation_log.register(name, self._mocker)
-        return self
-        
+
+
+class MatchBuilder(InvocationMockerBuilder):
+    
     def with(self, *arg_constraints, **kwarg_constraints):
         """Fully specify the method's arguments."""
         self._mocker.add_matcher(AllArgumentsMatcher(arg_constraints,
@@ -356,6 +353,26 @@ class InvocationMockerBuilder(object):
         return self
 
 
+class NameAndDirectArgsBuilder(InvocationMockerBuilder):
+
+    def __call__(self, *arg_constraints, **kwarg_constraints):
+        self._mocker.add_matcher(AllArgumentsMatcher(arg_constraints,
+                                                     kwarg_constraints))
+        return MatchBuilder(self._mocker, self._invocation_log)
+
+    def __getattr__(self, name):
+        """Define method name directly."""
+        self._mocker.add_matcher(MethodMatcher(name))
+        self._invocation_log.register(name, self._mocker)
+        return self
+
+    def method(self, name):
+        """Define method name."""
+        self._mocker.add_matcher(MethodMatcher(name))
+        self._invocation_log.register(name, self._mocker)
+        return MatchBuilder(self._mocker, self._invocation_log)
+
+
 class Invocation(object):
 
     def __init__(self, name, args, kwargs):
@@ -404,6 +421,9 @@ class Mock(object):
         self._proxy = Proxy(self)
         self._invocation_log = InvocationLog()
 
+    def __getattr__(self, name):
+        return BoundMethod(name, self)
+
     def _unsatisfied_mockers(self):
         unsatisfied = []
         for mocker in self._mockers:
@@ -438,7 +458,7 @@ class Mock(object):
             invocation_matcher = once()
         mocker = InvocationMocker(invocation_matcher)
         self._add_mocker(mocker)
-        return InvocationMockerBuilder(mocker, self._invocation_log)
+        return NameAndDirectArgsBuilder(mocker, self._invocation_log)
 
     def stubs(self):
         """Define a method that may or may not be called.
@@ -447,7 +467,7 @@ class Mock(object):
         """
         mocker = InvocationMocker(StubInvocationMatcher())
         self._add_mocker(mocker)
-        return InvocationMockerBuilder(mocker, self._invocation_log)
+        return NameAndDirectArgsBuilder(mocker, self._invocation_log)
 
     def proxy(self):
         """Return the mock object instance.""" 

@@ -8,17 +8,17 @@ class ErrorsTest(unittest.TestCase):
 
     def test_unsatisfied_expectation(self):
         mock = Mock()
-        mock.expects(once()).method("foo")
+        mock.expects(once()).foo()
         mock.verify()
 
     def test_unexpected_call(self):
         mock = Mock()
-        mock.proxy().foo()
+        mock.foo()
 
     def test_conflicting_call(self):
         mock = Mock()
-        mock.expects(never()).method("foo")
-        mock.proxy().foo()
+        mock.expects(never()).foo()
+        mock.foo()
 
 
 if __name__ == '__main__':

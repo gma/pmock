@@ -242,8 +242,8 @@ class InvocationMockerAdditionalTest(testsupport.ErrorMsgAssertsMixin,
                          "invocation_matcher added_matcher1, action [quack]")
 
 
-class InvocationMockerBuilderTest(testsupport.ErrorMsgAssertsMixin,
-                                  unittest.TestCase):
+class MatchBuilderTest(testsupport.ErrorMsgAssertsMixin,
+                       unittest.TestCase):
 
     def setUp(self):
         class MockInvocationMocker:
@@ -259,19 +259,8 @@ class InvocationMockerBuilderTest(testsupport.ErrorMsgAssertsMixin,
                 self.action = action
         self.mocker = MockInvocationMocker()
         self.invocation_log = pmock.InvocationLog()
-        self.builder = pmock.InvocationMockerBuilder(self.mocker,
-                                                     self.invocation_log)
+        self.builder = pmock.MatchBuilder(self.mocker, self.invocation_log)
         
-    def test_add_method_matcher(self):
-        self.assert_(self.builder.method("chicken") is not None)
-        self.assert_(isinstance(self.mocker.added_matcher,
-                                pmock.MethodMatcher))
-        self.assert_(self.mocker.added_matcher.matches(
-            pmock.Invocation("chicken", (), {})))
-        self.assertEqual(self.mocker.label, None)
-        self.assertEqual(self.invocation_log.get_registered("chicken"),
-                         self.mocker)
-
     def test_add_with_matcher(self):
         self.assert_(self.builder.with(pmock.eq("egg")) is not None)
         self.assert_(isinstance(self.mocker.added_matcher,
@@ -337,6 +326,51 @@ class InvocationMockerBuilderTest(testsupport.ErrorMsgAssertsMixin,
                                 pmock.AfterLabelMatcher))
         self.assertEqual(str(self.mocker.added_matcher),
                          ".after('rooster' on mock %s)" % str(other_mock))
+
+
+class NameAndDirectArgsBuilderTest(unittest.TestCase):
+
+    def setUp(self):
+        class MockInvocationMocker:
+            def __init__(self):
+                self.added_matchers = []
+            def add_matcher(self, matcher):
+                self.added_matchers.append(matcher)
+        self.mocker = MockInvocationMocker()
+        self.invocation_log = pmock.InvocationLog()
+        self.builder = pmock.NameAndDirectArgsBuilder(self.mocker,
+                                                      self.invocation_log)
+
+    def test_add_method_matcher(self):
+        self.assert_(self.builder.method("chicken") is not None)
+        self.assert_(isinstance(self.mocker.added_matchers[0],
+                                pmock.MethodMatcher))
+        self.assert_(self.mocker.added_matchers[0].matches(
+            pmock.Invocation("chicken", (), {})))
+        self.assertEqual(self.invocation_log.get_registered("chicken"),
+                         self.mocker)
+
+    def test_add_direct_method_matcher(self):
+        self.assert_(self.builder.chicken() is not None)
+        self.assert_(isinstance(self.mocker.added_matchers[0],
+                                pmock.MethodMatcher))
+        self.assert_(self.mocker.added_matchers[0].matches(
+            pmock.Invocation("chicken", (), {})))
+        self.assert_(self.mocker.added_matchers[1].matches(
+            pmock.Invocation("chicken", (), {})))
+        self.assertEqual(self.invocation_log.get_registered("chicken"),
+                         self.mocker)
+
+    def test_add_direct_method_and_arg_matcher(self):
+        self.assert_(self.builder.chicken(pmock.eq("egg")) is not None)
+        self.assert_(isinstance(self.mocker.added_matchers[0],
+                                pmock.MethodMatcher))
+        self.assert_(self.mocker.added_matchers[0].matches(
+            pmock.Invocation("chicken", (), {})))
+        self.assert_(self.mocker.added_matchers[1].matches(
+            pmock.Invocation("chicken", ("egg",), {})))
+        self.assertEqual(self.invocation_log.get_registered("chicken"),
+                         self.mocker)
 
 
 class MethodMatcherTest(unittest.TestCase):
@@ -560,6 +594,19 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
     def test_name(self):
         mock = pmock.Mock("white fang")
         self.assertEqual(mock.name, "white fang")
+
+    def test_call_directly(self):
+        class Mocker:
+            def matches(self, invocation):
+                self.invocation = invocation
+                return True
+            def invoke(self): pass
+        mock = pmock.Mock()
+        mocker = Mocker()
+        mock._add_mocker(mocker)
+        mock.howl(under='moon')
+        self.assert_(mocker.invocation.name, "howl")
+        self.assert_(mocker.invocation.kwargs['under'], "moon")
 
 
 ##############################################################################

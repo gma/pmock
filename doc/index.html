@@ -17,7 +17,7 @@ import pmock
 class InstrumentTest(unittest.TestCase):
     def test_analysis(self):
         analyser_mock = pmock.Mock()
-        analyser_mock.expects().method("analyse").with(pmock.eq("123")).will(
+        analyser_mock.expects().analyse(pmock.eq("123")).will(
             pmock.return_value("30"))
         instrument = Instrument(analyser_mock)
         instrument.insert("sample#123")
@@ -46,7 +46,7 @@ See the <a href="overview.html">overview</a> for an introduction on how to use p
 </ul>
 
 <h2>Download</h2>
-<p><a href="http://prdownloads.sourceforge.net/pmock/pmock-0.1.tar.gz?download">pmock 0.1</a></p>
+<p><a href="http://prdownloads.sourceforge.net/pmock/pmock-0.2.tar.gz?download">pmock 0.2</a></p>
 
 <h2>Documentation</h2>
 <ul>
