@@ -769,23 +769,23 @@ class MockTestCaseTest(unittest.TestCase):
         self.assertEqual(len(result.failures), 1)
         self.assertEqual(len(result.errors), 0)
 
-    def test_auto_verify_independent_of_fixtures(self):
-        fixtures = []
+    def test_auto_verify_order(self):
+        events = []
         class MockMatcher:
-            def verify(self): self.is_verified = True
+            def verify(self): events.append('verify')
         matcher = MockMatcher()
         class Test(pmock.MockTestCase):
             def setUp(self):
-                fixtures.append('setUp')
+                events.append('setUp')
             def tearDown(self):
-                fixtures.append('tearDown')
+                events.append('tearDown')
             def test_method(self):
                 self.mock().expects(matcher)
+                events.append('test')
         test = Test('test_method')
         result = unittest.TestResult()
         test()
-        self.assert_(matcher.is_verified)
-        self.assertEqual(fixtures, ['setUp', 'tearDown'])
+        self.assertEqual(events, ['setUp', 'test', 'verify', 'tearDown'])
 
 
 ##############################################################################

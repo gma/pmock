@@ -159,7 +159,7 @@ The test code can be made more concise by importing the pmock module's public cl
 
 <h2 id="TestBaseClass">Test base class</h2>
 
-The <code>MockTestCase</code> class is a convenience base class for tests. It provides the <code>mock</code> method for creating mock objects that will be automatically verified after the test method has run. The verify calls are made to the mock object after <code>tearDown</code> has been called.
+The <code>MockTestCase</code> class is a convenience base class for tests. It provides the <code>mock</code> method for creating mock objects that will be automatically verified after the test method has run. The verify calls are considered to be part of the test and so are made to the mock object before <code>tearDown</code> has been called.
 
 <pre>
     class FooTest(pmock.MockTestCase):
