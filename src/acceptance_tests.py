@@ -392,10 +392,9 @@ class NeverTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
 
 
 class OrderedCallsBasicTest(testsupport.ErrorMsgAssertsMixin,
-                            pmock.MockTestCase):
+                            unittest.TestCase):
 
     def setUp(self):
-        pmock.MockTestCase.setUp(self)
         self.mock = pmock.Mock()
         self.mock.expects(pmock.once()).method("bull").label("bull call")
         self.mock.expects(pmock.once()).method("cow").after("bull call")
@@ -416,14 +415,14 @@ class OrderedCallsBasicTest(testsupport.ErrorMsgAssertsMixin,
             
 
 class OrderedCallsAcrossMocksTest(testsupport.ErrorMsgAssertsMixin,
-                                  pmock.MockTestCase):
+                                  unittest.TestCase):
 
     def setUp(self):
-        pmock.MockTestCase.setUp(self)
-        self.mock1 = pmock.Mock()
+        self.mock1 = pmock.Mock("field")
         self.mock2 = pmock.Mock()
-        self.mock1.expects(pmock.once()).method("bull").label("bull call")
-        self.mock2.expects(pmock.once()).method("cow").after("bull call")
+        self.mock1.expects(pmock.once()).method("bull").label("bovine")
+        self.mock2.expects(pmock.once()).method("cow").after("bovine",
+                                                             self.mock1)
 
     def test_call_in_order(self):
         self.mock1.proxy().bull()
@@ -436,12 +435,12 @@ class OrderedCallsAcrossMocksTest(testsupport.ErrorMsgAssertsMixin,
             self.mock2.proxy().cow()
             self.fail()
         except pmock.MatchError, err:
-            self.assertUnexpectedCallMsg(err.msg, "cow()",
-                                         ["once cow.after('bull call')"])
+            self.assertUnexpectedCallMsg(
+                err.msg, "cow()", ["once cow.after('bovine' on mock 'field')"])
 
 
 class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
-                                 pmock.MockTestCase):
+                                 unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()

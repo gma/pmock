@@ -15,7 +15,7 @@
 <li><a href="#CallOrderingExpectations">Call ordering expectations<a/></li>
 <li><a href="#MockBehaviour">Mock behaviour<a/></li>
 <li><a href="#Stubs">Stubs<a/></li>
-<li><a href="#FromImports">From imports<a/></li>
+<li><a href="#FromImports"><code>from</code> imports<a/></li>
 <li><a href="#FurtherInformation">Further information<a/></li>
 </ul>
 
@@ -32,7 +32,7 @@ A mock object is created to represent a real object for the purposes of a unit t
 Expectations are defined in terms of the methods that are meant to be called on the mock object.
 
 <pre>
-    mock.expects().method("render")
+    mock.expects(pmock.once()).method("render")
 </pre>
 
 The mock's proxy can now be called with the expected methods.
@@ -65,7 +65,7 @@ If any of the mock's expected methods haven't been called then the <code>verify<
 By default a method expectation defined on a mock will allow the mock to be called with any arguments. The expectation can be constrained to expect certain arguments using the <code>with</code> method.
 
 <pre>
-    mock.expects().method("render").with(pmock.eq(640), pmock.eq(480) )
+    mock.expects(pmock.once()).method("render").with(pmock.eq(640), pmock.eq(480) )
 </pre>
 
 The arguments to the <code>with</code> method are constraint objects which are evaluated on the actual arguments when a call is made to the mock object.
@@ -73,36 +73,45 @@ The arguments to the <code>with</code> method are constraint objects which are e
 <p>The <code>with</code> method can also be used to constrain keyword arguments
 
 <pre>
-    mock.expects().method("render").with(brush=pmock.same(print.BIG_BRUSH))
+    mock.expects(pmock.once()).method("render").with(brush=pmock.same(print.BIG_BRUSH))
 </pre>
 
 <h2 id="NumberOfCallsToTheSameMethod">Number of calls to the same method</h2>
 
-By default an expectation allows one call to the defined method. If the method is called again an exception will be raised. An optional parameter to the <code>expect</code> method allows more flexibility.
+The argument to the <code>expects</code> method describes how often the expected method can be called.
 
 <pre>
+    mock.expects(pmock.once()).method("simmer").any_args()
     mock.expects(pmock.at_least_once()).method("fry").no_args()
     mock.expects(pmock.never()).method("boil")
 </pre>
-
 
 <h2 id="CallOrderingExpectations">Call ordering expectations</h2>
 
 The order of calls to the mock object can be specified with the <code>after</code> method.
 
 <pre>
-    mock.expects().method("invalidate")
-    mock.expects().method("render").after("invalidate")
+    mock.expects(pmock.once()).method("invalidate")
+    mock.expects(pmock.once()).method("render").after("invalidate")
 </pre>
 
 If the calls are made out of order then an exception is raised.
 
-<p>An explicit label can defined on an expectation and then used in the <code>after</code> method rather than using the method name if convenient.
+<p>An explicit label can be set for an expectation and used in the <code>after</code> method instead of using the method name if needed.
 
 <pre>
-    mock.expects().method("add").with(pmock.eq(10)).label("add #1")
-    mock.expects().method("add").with(pmock.eq(15)).label("add #2").after("add #1")
-    mock.expects().method("add").with(pmock.eq(5)).after("add #2")
+    mock.expects(pmock.once()).method("add").with(pmock.eq(10)).label("add #1")
+    mock.expects(pmock.once()).method("add").with(pmock.eq(15)).label("add #2").after("add #1")
+    mock.expects(pmock.once()).method("add").with(pmock.eq(5)).after("add #2")
+</pre>
+
+The order of calls can also be defined across different mock objects.
+
+<pre>
+    other_mock = pmock.Mock()
+    other_mock.expects(pmock.once()).method("add")
+    mock = pmock.Mock()
+    mock.expects(pmock.once()).method("sum").after("add", other_mock)
 </pre>
 
 
@@ -111,8 +120,8 @@ If the calls are made out of order then an exception is raised.
 Simple behaviours can be specified for the mock when an expected call is made using the <code>with</code> method.
 
 <pre>
-    mock.expects().method("calculate").will(pmock.return_value(20))
-    mock.expects().method("consume").will(pmock.raise_exception(RuntimeError("invalid"))
+    mock.expects(pmock.once()).method("calculate").will(pmock.return_value(20))
+    mock.expects(pmock.once()).method("consume").will(pmock.raise_exception(RuntimeError("invalid"))
 </pre>
 
 <h2 id="Stubs">Stubs</h2>
@@ -120,18 +129,18 @@ Simple behaviours can be specified for the mock when an expected call is made us
 Stubs allow behaviours to be specified for methods that we don't care whether they are called or not, and so don't need to be included in the mock's verification check.
 
 <pre>
-    mock.stub().method("sleep").will(pmock.return_value(None))
+    mock.stubs(pmock.once()).method("sleep").will(pmock.return_value(None))
 </pre>
 
 <h2 id="FromImports">From imports</h2>
 
-The test code can be made more concise by importing the pmock classes and functions into the test module.
+The test code can be made more concise by importing the pmock module's public classes and functions into the test module.
 
 <pre>
     from pmock import *
 
     mock = Mock()
-    mock.expects().method("calulate").with(eq(34), eq(2)).will(return_value(68))
+    mock.expects(pmock.once()).method("calulate").with(eq(34), eq(2)).will(return_value(68))
 </pre>
 
 <h2 id="FurtherInformation">Further information</h2>

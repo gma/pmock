@@ -211,22 +211,9 @@ class MethodMatcher(object):
 
 class InvocationLog(object):
 
-    singleton = None
-    
     def __init__(self):
-        self._invocations = {}
         self._registered = {}
 
-    def clear(self):
-        self._invocations.clear()
-        self._registered.clear()
-
-    def invoked(self, label):
-        self._invocations[label] = True
-
-    def has_been_invoked(self, label):
-        return self._invocations.has_key(label)
-        
     def register(self, label, mocker):
         self._registered[label] = mocker
 
@@ -235,28 +222,27 @@ class InvocationLog(object):
 
     def get_registered(self, label):
         return self._registered[label]
-        
-    def instance(cls):
-        if cls.singleton is None:
-            cls.singleton = InvocationLog()
-        return cls.singleton
-
-    instance = classmethod(instance)
 
 
 class AfterLabelMatcher(object):
 
-    def __init__(self, label, invocation_log):
+    def __init__(self, label, invocation_log, description=None):
         self._invocation_log = invocation_log
         self._label = label
+        self._description = description
         if not invocation_log.is_registered(label):
             raise DefinitionError.create_unregistered_label_error(label)
         
     def __str__(self):
-         return ".after(%s)" % repr(self._label)
+        if self._description is None:
+            suffix = ""
+        else:
+            suffix = self._description
+        return ".after(%s%s)" % (repr(self._label), suffix)
 
     def matches(self, invocation):
-        return self._invocation_log.has_been_invoked(self._label)
+        mocker = self._invocation_log.get_registered(self._label)
+        return mocker.has_been_invoked()
 
 
 class InvocationMocker(object):
@@ -267,7 +253,7 @@ class InvocationMocker(object):
         self._matchers.append(invocation_matcher)
         self._action = None
         self._label = None
-        self._is_explicit_label = False
+        self._has_been_invoked = False
 
     def __str__(self):
         strs = ["%s " % str(self._invocation_matcher)]
@@ -275,7 +261,7 @@ class InvocationMocker(object):
             strs.append(str(matcher))
         if self._action is not None:
             strs.append(", %s" % self._action)
-        if self._is_explicit_label:
+        if self._label is not None:
             strs.append(" [%s]" % self._label)
         return "".join(strs)
 
@@ -289,37 +275,34 @@ class InvocationMocker(object):
         return self._invocation_matcher.is_satisfied()
 
     def invoke(self):
-        InvocationLog.instance().invoked(self._label)
+        self._has_been_invoked = True
         self._invocation_matcher.invoke()
         if self._action is not None:
             return self._action.invoke()
-                    
+
+    def has_been_invoked(self):
+        return self._has_been_invoked
+    
     def matches(self, invocation):
         for matcher in self._matchers:
             if not matcher.matches(invocation):
                 return False
         return True
 
-    def set_label(self, label, is_explicit):
-        invocation_log = InvocationLog.instance()
-        if is_explicit and invocation_log.is_registered(label):
-            mocker = invocation_log.get_registered(label)
-            raise DefinitionError.create_duplicate_label_error(
-                label, str(mocker))
+    def set_label(self, label):
         self._label = label
-        self._is_explicit_label = is_explicit
-        invocation_log.register(label, self)
 
 
 class InvocationMockerBuilder(object):
 
-    def __init__(self, mocker):
+    def __init__(self, mocker, invocation_log):
         self._mocker = mocker
+        self._invocation_log = invocation_log
         
     def method(self, name):
         """Define method name."""
-        self._mocker.set_label(name, False)
         self._mocker.add_matcher(MethodMatcher(name))
+        self._invocation_log.register(name, self._mocker)
         return self
         
     def with(self, *arg_constraints, **kwarg_constraints):
@@ -351,13 +334,25 @@ class InvocationMockerBuilder(object):
 
     def label(self, label_str):
         """Define a label for use in other mock's L{after} method."""
-        self._mocker.set_label(label_str, True)
+        if self._invocation_log.is_registered(label_str):
+            raise DefinitionError.create_duplicate_label_error(
+                label_str, str(self._invocation_log.get_registered(label_str)))
+        self._mocker.set_label(label_str)
+        self._invocation_log.register(label_str, self._mocker)
         return self
 
-    def after(self, label):
+    def after(self, label_str, other_mock=None):
         """Expected to be called after the method with supplied label."""
-        self._mocker.add_matcher(AfterLabelMatcher(label,
-                                                   InvocationLog.instance()))
+        if other_mock is None:
+            matcher = AfterLabelMatcher(label_str, self._invocation_log)
+        else:
+            if other_mock.name is not None:
+                description = repr(other_mock.name)
+            else:
+                description = str(other_mock)
+            matcher = AfterLabelMatcher(label_str, other_mock._invocation_log,
+                                        " on mock %s" % description)
+        self._mocker.add_matcher(matcher)
         return self
 
 
@@ -403,9 +398,11 @@ class InvokeConflictError(Exception):
 class Mock(object):
     """Define a mock object's expectations and simple behaviour."""
 
-    def __init__(self):
+    def __init__(self, name=None):
+        self.name = name
         self._mockers = []
         self._proxy = Proxy(self)
+        self._invocation_log = InvocationLog()
 
     def _unsatisfied_mockers(self):
         unsatisfied = []
@@ -441,7 +438,7 @@ class Mock(object):
             invocation_matcher = once()
         mocker = InvocationMocker(invocation_matcher)
         self._add_mocker(mocker)
-        return InvocationMockerBuilder(mocker)
+        return InvocationMockerBuilder(mocker, self._invocation_log)
 
     def stubs(self):
         """Define a method that may or may not be called.
@@ -450,7 +447,7 @@ class Mock(object):
         """
         mocker = InvocationMocker(StubInvocationMatcher())
         self._add_mocker(mocker)
-        return InvocationMockerBuilder(mocker)
+        return InvocationMockerBuilder(mocker, self._invocation_log)
 
     def proxy(self):
         """Return the mock object instance.""" 
@@ -461,13 +458,6 @@ class Mock(object):
         unsatisfied = self._unsatisfied_mockers()
         if len(unsatisfied) > 0:
             raise VerificationError.create_unsatisfied_error(unsatisfied)
-
-
-class MockTestCase(unittest.TestCase):
-    """Unit test base class to help reset ordering expectations."""
-    
-    def setUp(self):
-        InvocationLog.instance().clear()
 
 
 ##############################################################################
