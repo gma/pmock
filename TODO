@@ -1,0 +1,11 @@
+todo:
++ add expect parameterisation (once()...)
++ add with() constraints and(), not(), or()
++ ordering expectations via after(), id()
++ with_no_arguments() 
++ stub() methods
++ support for python properties
++ docs, examples, web page
+
+possibilities:
++ alternative to LIFO expectation matcher, using combinatorial search to satisfy constraints
