@@ -4,7 +4,8 @@ setup (
     name = "pmock",
     version = "0.1",
     description = "pmock - a mock objects framework for Python",
-    py_modules = ['pmock']
+    package_dir = {"": "src"},
+    py_modules = ["pmock"]
     )
       
       

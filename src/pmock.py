@@ -58,47 +58,65 @@ __all__ = []
 # Mock objects framework
 ##############################################################################
 
-
-class Error(AssertionError):
+class ExpectationError(AssertionError):
 
     def __init__(self, msg):
         AssertionError.__init__(self, msg)
         self.msg = msg
 
+    def _mockers_str(cls, mockers):
+        matchers_strs = [mocker.matchers_str() for mocker in mockers]
+        return ", ".join(matchers_strs)
 
-class VerificationError(Error):
-    pass
-
-
-class MatchError(Error):
-    pass
+    _mockers_str = classmethod(_mockers_str)
 
 
-class AnyArgumentsMatcher(object):
+class VerificationError(ExpectationError):
 
-    def __str__(self):
-        return "..."
+    def create_unsatisfied_error(cls, unsatisfied_mockers):
+        msg = ("unsatisfied expectation(s): %s" %
+               cls._mockers_str(unsatisfied_mockers))
+        return VerificationError(msg)
 
-    def matches(self, call):
-        return True
+    create_unsatisfied_error = classmethod(create_unsatisfied_error)
 
 
+class MatchError(ExpectationError):
+
+    def create_conflict_error(cls, call, mocker):
+        msg = ("call %s, conflicts with expectation: %s" %
+               (call, mocker.matchers_str()))
+        return MatchError(msg)
+
+    create_conflict_error = classmethod(create_conflict_error)
+
+    def create_unexpected_error(cls, call, unsatisfied_mockers):
+        if len(unsatisfied_mockers) > 0:
+            err_msg = ("unexpected call %s, expectation(s): %s" %
+                       (call, cls._mockers_str(unsatisfied_mockers)))
+        else:
+            err_msg = ("unexpected call %s, no expectations remaining" %
+                       call)
+        return MatchError(err_msg)
+
+    create_unexpected_error = classmethod(create_unexpected_error)
+
+    
 class AbstractArgumentsMatcher(object):
 
     def __init__(self, arg_constraints=(), kwarg_constraints={}):
         self._arg_constraints = arg_constraints
         self._kwarg_constraints = kwarg_constraints
-        keywords = self._kwarg_constraints.keys()
-        keywords.sort()
-        self._sorted_keywords = keywords
 
     def __str__(self):
         if (len(self._arg_constraints) == 0 and
             len(self._kwarg_constraints) == 0):
-            return "..."
+            return self._no_explicit_constraints_str()
         else:
             arg_strs = [str(c) for c in self._arg_constraints]
-            for kw in self._sorted_keywords:
+            keywords = self._kwarg_constraints.keys()
+            keywords.sort()
+            for kw in keywords:
                 constraint = self._kwarg_constraints[kw]
                 arg_strs.append("%s=%s" % (kw, str(constraint)))
             return ", ".join(arg_strs)
@@ -111,7 +129,8 @@ class AbstractArgumentsMatcher(object):
 
     def _matches_kwargs(self, call):
         for kw, constraint in self._kwarg_constraints.iteritems():
-            if not constraint.eval(call.kwargs[kw]):
+            if (not call.kwargs.has_key(kw) or
+                not constraint.eval(call.kwargs[kw])):
                 return False
         return True
 
@@ -121,34 +140,30 @@ class AbstractArgumentsMatcher(object):
 
     
 class LeastArgumentsMatcher(AbstractArgumentsMatcher):
-    
+
+    def _no_explicit_constraints_str(self):
+        return "..."
+
     def _matches_args(self, call):
         if len(self._arg_constraints) > len(call.args):
             return False
         return AbstractArgumentsMatcher._matches_args(self, call)
 
-    def _matches_kwargs(self, call):
-        missing_kwargs = []
-        for kw in self._kwarg_constraints.keys():
-            if kw not in call.kwargs.keys():
-                missing_kwargs.append(kw)
-        if len(missing_kwargs) > 0:
-            return False
-        return AbstractArgumentsMatcher._matches_kwargs(self, call)
-
 
 class AllArgumentsMatcher(AbstractArgumentsMatcher):
+
+    def _no_explicit_constraints_str(self):
+        return ""
 
     def _matches_args(self, call):
         if len(self._arg_constraints) != len(call.args):
             return False
         return AbstractArgumentsMatcher._matches_args(self, call)
 
-    def _matches_kwargs(self, call) :
-        call_keys = call.kwargs.keys()
-        call_keys.sort()
-        if self._sorted_keywords != call_keys:
-            return False
+    def _matches_kwargs(self, call):
+        for call_kw in call.kwargs.iterkeys():
+            if call_kw not in self._kwarg_constraints:
+                return False
         return AbstractArgumentsMatcher._matches_kwargs(self, call)
 
 
@@ -166,23 +181,30 @@ class MethodMatcher(object):
 
 class CallMocker(object):
 
-    def __init__(self):
+    def __init__(self, call_matcher):
+        self._call_matcher = call_matcher
         self._method_matcher = None
-        self._arguments_matcher = AnyArgumentsMatcher()
+        self._arguments_matcher = LeastArgumentsMatcher()
         self._action = is_void()
 
-    def invoke_action(self):
+    def is_satisfied(self):
+        return self._call_matcher.is_satisfied()
+
+    def invoke(self):
+        self._call_matcher.invoke()
         return self._action.invoke()
     
     def is_void(self):
         self._action = is_void()
         return self
     
-    def method_str(self):
-        return "%s(%s)" % (self._method_matcher, self._arguments_matcher)
+    def matchers_str(self):
+        return "%s %s(%s)" % (self._call_matcher, self._method_matcher,
+                              self._arguments_matcher)
     
     def matches(self, call):
-        return (self._method_matcher.matches(call) and
+        return (self._call_matcher.matches() and
+                self._method_matcher.matches(call) and
                 self._arguments_matcher.matches(call))
 
     def method(self, name):
@@ -203,6 +225,9 @@ class CallMocker(object):
                                                         kwarg_constraints)
         return self
 
+    def no_args(self):
+        self._arguments_matcher = AllArgumentsMatcher()
+
 
 class MockCall(object):
 
@@ -213,8 +238,10 @@ class MockCall(object):
 
     def __str__(self):
         arg_strs = [repr(arg) for arg in self.args]
-        for kw, arg in self.kwargs.iteritems():
-            arg_strs.append("%s=%s" % (kw, repr(arg)))
+        keywords = self.kwargs.keys()
+        keywords.sort()
+        for kw in keywords:
+            arg_strs.append("%s=%s" % (kw, repr(self.kwargs[kw])))
         return "%s(%s)" % (self.name, ", ".join(arg_strs))
 
 
@@ -237,44 +264,50 @@ class Proxy(object):
         return MockedMethod(name, self._mock)
 
 
+class InvokeConflictError(Exception):
+    pass
+
+
 class Mock(object):
 
     def __init__(self):
-        self._expected_calls = []
+        self._expected_mockers = []
         self._proxy = Proxy(self)
 
-    def _expected_calls_str(self):
-        uncalled_strs = [call_mocker.method_str()
-                         for call_mocker in self._expected_calls]
-        return ", ".join(uncalled_strs)
+    def _unsatisfied_mockers(self):
+        unsatisfied = []
+        for mocker in self._expected_mockers:
+            if not mocker.is_satisfied():
+                unsatisfied.append(mocker)
+        return unsatisfied
+
+    def _unmatched_method_called(self, call):
+        unsatisfied_mockers = self._unsatisfied_mockers()
+        raise MatchError.create_unexpected_error(call, unsatisfied_mockers)
         
     def method_called(self, call):
         matching_mocker = None
-        for call_mocker in self._expected_calls:
-            if call_mocker.matches(call):
-                self._expected_calls.remove(call_mocker)
-                return call_mocker.invoke_action()
-        else:
-            if len(self._expected_calls) > 0:
-                err_msg = ("unexpected call %s, expected call(s) %s" %
-                           (call, self._expected_calls_str()))
-            else:
-                err_msg = ("unexpected call %s, no expected calls remaining" %
-                           call)
-            raise MatchError(err_msg)
+        for mocker in self._expected_mockers:
+            if mocker.matches(call):
+                try:
+                    return mocker.invoke()
+                except InvokeConflictError:
+                    raise MatchError.create_conflict_error(call, mocker)
+        self._unmatched_method_called(call)
 
-    def expect(self):
-        call_mocker = CallMocker()
-        self._expected_calls.insert(0, call_mocker)
-        return call_mocker
+    def expect(self, mocker=None):
+        if mocker is None:
+            mocker = once()
+        self._expected_mockers.insert(0, mocker)
+        return mocker
 
     def proxy(self):
         return self._proxy
     
     def verify(self):
-        if len(self._expected_calls) > 0:
-            raise VerificationError("expected method(s) %s uncalled" %
-                                    self._expected_calls_str())
+        unsatisfied = self._unsatisfied_mockers()
+        if len(unsatisfied) > 0:
+            raise VerificationError.create_unsatisfied_error(unsatisfied)
 
 
 ##############################################################################
@@ -301,6 +334,71 @@ class throw_exception(object):
 
     def invoke(self):
         raise self._exception
+
+
+##############################################################################
+# Call match constraints
+############################################################################## 
+
+class CallMatcher(object):
+
+    def __init__(self):
+        self._invoked = False
+
+    def invoke(self):
+        self._invoked = True
+
+    
+class OnceMatcher(CallMatcher):
+
+    def __str__(self):
+        return "once"
+    
+    def is_satisfied(self):
+        return self._invoked
+
+    def matches(self):
+        return not self._invoked
+
+
+def once():
+    return CallMocker(OnceMatcher())
+
+
+class AtLeastOnceMatcher(CallMatcher):
+
+    def __str__(self):
+        return "at least once"
+
+    def is_satisfied(self):
+        return self._invoked
+
+    def matches(self):
+        return True
+
+
+def at_least_once():
+    return CallMocker(AtLeastOnceMatcher())
+
+
+class NotCalledMatcher(CallMatcher):
+
+    def __str__(self):
+        return "not called"
+
+    def invoke(self):
+        CallMatcher.invoke(self)
+        raise InvokeConflictError
+
+    def is_satisfied(self):
+        return not self._invoked
+        
+    def matches(self):
+        return True
+
+
+def not_called():
+    return CallMocker(NotCalledMatcher())
 
 
 ##############################################################################
