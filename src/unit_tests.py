@@ -147,24 +147,24 @@ class LeastArgumentsMatcherTest(ArgumentsMatcherTestMixin, unittest.TestCase):
 class CallMockerTest(unittest.TestCase):
 
     def test_matches(self):
-        class MockMatcher:
+        class MockCallMatcher:
             def matches(self): return True
-        mocker = pmock.CallMocker(MockMatcher())
+        mocker = pmock.CallMocker(MockCallMatcher())
         mocker.method("skunk").with(pmock.eq("spray"))
         self.assert_(mocker.matches(pmock.MockCall("skunk", ("spray",), {})))
 
     def test_matches_with_at_least(self):
-        class MockMatcher:
+        class MockCallMatcher:
             def matches(self): return True        
-        mocker = pmock.CallMocker(MockMatcher())
+        mocker = pmock.CallMocker(MockCallMatcher())
         mocker.method("skunk").with_at_least(pmock.eq("spray"))
         self.assert_(
             mocker.matches(pmock.MockCall("skunk", ("spray", "forage"), {})))
 
     def test_matches_with_no_args(self):
-        class MockMatcher:
+        class MockCallMatcher:
             def matches(self): return True        
-        mocker = pmock.CallMocker(MockMatcher())
+        mocker = pmock.CallMocker(MockCallMatcher())
         mocker.method("skunk").no_args()
         self.assert_(mocker.matches(pmock.MockCall("skunk", (), {})))
         self.assert_(
@@ -173,25 +173,25 @@ class CallMockerTest(unittest.TestCase):
             not mocker.matches(pmock.MockCall("skunk", (), {"smell":"bad"})))
 
     def test_unmatched_call_matcher(self):
-        class MockMatcher:
+        class MockCallMatcher:
             def matches(self): return False
-        mocker = pmock.CallMocker(MockMatcher())
+        mocker = pmock.CallMocker(MockCallMatcher())
         mocker.method("skunk").with(pmock.eq("spray"))
         self.assert_(
             not mocker.matches(pmock.MockCall("skunk", ("spray",), {})))
 
     def test_unmatched_method(self):
-        class MockMatcher:
+        class MockCallMatcher:
             def matches(self): return True
-        mocker = pmock.CallMocker(MockMatcher())
+        mocker = pmock.CallMocker(MockCallMatcher())
         mocker.method("skunk").with(pmock.eq("spray"))
         self.assert_(
             not mocker.matches(pmock.MockCall("ferret", ("spray",), {})))
 
     def test_unmatched_args(self):
-        class MockMatcher:
+        class MockCallMatcher:
             def matches(self): return True
-        mocker = pmock.CallMocker(MockMatcher())
+        mocker = pmock.CallMocker(MockCallMatcher())
         mocker.method("skunk").with(pmock.eq("spray"))
         self.assert_(
             not mocker.matches(pmock.MockCall("skunk", ("fly",), {})))
@@ -216,13 +216,31 @@ class CallMockerTest(unittest.TestCase):
         self.assert_(mock_call_matcher.invoked)
         self.assert_(mock_action.invoked)
         
-    def test_matches_str(self):
+    def test_str(self):
         mocker = pmock.CallMocker(pmock.OnceMatcher())
         mocker.method("skunk")
         self.assertEqual(mocker.matchers_str(),
-                         "%s %s(%s)" % (pmock.OnceMatcher(),
-                                        "skunk",
-                                        pmock.LeastArgumentsMatcher()))
+                         "%s skunk(%s)" % (pmock.OnceMatcher(),
+                                           pmock.LeastArgumentsMatcher()))
+
+    def test_labelled_str(self):
+        pmock.InvocationLog.instance().register("smelly")
+        mocker = pmock.CallMocker(pmock.OnceMatcher())
+        mocker.method("skunk").label("smelly")
+        self.assertEqual(mocker.matchers_str(),
+                         "%s skunk(%s).label('smelly')" %
+                         (pmock.OnceMatcher(), pmock.LeastArgumentsMatcher()))
+
+    def test_after_str(self):
+        invocation_log = pmock.InvocationLog.instance()
+        invocation_log.register("smelly")
+        mocker = pmock.CallMocker(pmock.OnceMatcher())
+        mocker.method("skunk").after("smelly")
+        self.assertEqual(mocker.matchers_str(),
+                         "%s skunk(%s).%s" %
+                         (pmock.OnceMatcher(),
+                          pmock.LeastArgumentsMatcher(),
+                          pmock.AfterLabelMatcher("smelly", invocation_log)))
 
     def test_satisfaction(self):
         class MockCallMatcher:
@@ -232,6 +250,15 @@ class CallMockerTest(unittest.TestCase):
         self.assert_(mocker1.is_satisfied())
         mocker2 = pmock.CallMocker(MockCallMatcher(False))
         self.assert_(not mocker2.is_satisfied())
+
+    def test_invoking_makes_after_match(self):
+        mocker1 = pmock.CallMocker(
+            pmock.OnceMatcher()).method("skunk").label("skunk call")
+        mocker2 = pmock.CallMocker(
+            pmock.OnceMatcher()).method("smell").after("skunk call")
+        self.assert_(not mocker2.matches(pmock.MockCall("smell", (), {})))
+        mocker1.invoke()
+        self.assert_(mocker2.matches(pmock.MockCall("smell", (), {})))
 
 
 class MethodMatcherTest(unittest.TestCase):
@@ -249,6 +276,64 @@ class MethodMatcherTest(unittest.TestCase):
  
     def test_str(self):
         self.assertEqual(str(self.method_matcher), "horse")
+
+
+class InvocationLogTest(unittest.TestCase):
+
+    def setUp(self):
+        self.invocation_log = pmock.InvocationLog()
+
+    def test_not_registered(self):
+        self.assert_(not self.invocation_log.is_registered("racoon"))
+
+    def test_registered(self):
+        self.invocation_log.register("racoon")
+        self.assert_(self.invocation_log.is_registered("racoon"))
+
+    def test_has_not_been_invoked(self):
+        self.assert_(not self.invocation_log.has_been_invoked("racoon"))
+
+    def test_has_been_invoked(self):
+        self.invocation_log.invoked("racoon")
+        self.assert_(self.invocation_log.has_been_invoked("racoon"))
+
+    def test_reset(self):
+        self.invocation_log.register("racoon")
+        self.invocation_log.invoked("racoon")
+        self.invocation_log.clear()
+        self.assert_(not self.invocation_log.has_been_invoked("racoon"))
+        self.assert_(not self.invocation_log.is_registered("racoon"))
+
+    def test_singleton(self):
+        self.assert_(pmock.InvocationLog.instance() is
+                     pmock.InvocationLog.instance())
+
+
+class AfterLabelMatcherTest(testsupport.ErrorMsgAssertsMixin,
+                            unittest.TestCase):
+
+    def setUp(self):
+        self.invocation_log = pmock.InvocationLog()
+        self.invocation_log.register("weasel")
+        self.matcher = pmock.AfterLabelMatcher("weasel", self.invocation_log)
+        
+    def test_uninvoked_doesnt_match(self):
+        self.assert_(not self.matcher.matches())
+
+    def test_invoked_matches(self):
+        self.invocation_log.invoked("weasel")
+        self.assert_(self.matcher.matches())
+
+    def test_str(self):
+        self.assertEqual(str(self.matcher), "after('weasel')")
+
+    def test_unregistered_label(self):
+        try:
+            self.matcher = pmock.AfterLabelMatcher("stoat",
+                                                   self.invocation_log)
+            self.fail("should raise because label isn't registered")
+        except pmock.DefinitionError, err:
+            self.assertUndefinedLabelMsg(err.msg, "stoat")
 
 
 class MockCallTest(unittest.TestCase):
@@ -377,6 +462,26 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
             self.assertConflictedCallMsg(err.msg,
                                          str(pmock.MockCall("wolf", (), {})),
                                          "conflicted")
+
+
+class MockTestCaseTest(unittest.TestCase):
+
+    def test_mock_test_case_clears_invocation_log(self):
+        class MockTest(pmock.MockTestCase):
+            def test_dummy(self): pass
+        test = MockTest("test_dummy")
+        pmock.InvocationLog.instance().invoked("bat")
+        test.run()
+        self.assert_(
+            not pmock.InvocationLog.instance().has_been_invoked("bat"))
+
+    def test_normal_test_case_doesnt_clear_invocation_log(self):
+        class MockTest(unittest.TestCase):
+            def test_dummy(self): pass
+        test = MockTest("test_dummy")
+        pmock.InvocationLog.instance().invoked("bat")
+        test.run()
+        self.assert_(pmock.InvocationLog.instance().has_been_invoked("bat"))
 
 
 class OnceMatcherTest(unittest.TestCase):

@@ -355,5 +355,92 @@ class NotCalledCallTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
                                          "not called rabbit(...)")
 
 
+class OrderedCallsBasicTest(testsupport.ErrorMsgAssertsMixin,
+                            pmock.MockTestCase):
+
+    def setUp(self):
+        pmock.MockTestCase.setUp(self)
+        self.mock = pmock.Mock()
+        self.mock.expect().method("bull").label("bull call")
+        self.mock.expect().method("cow").after("bull call")
+
+    def test_call_in_order(self):
+        self.mock.proxy().bull()
+        self.mock.proxy().cow()
+        self.mock.verify()
+
+    def test_call_out_of_order_doesnt_match(self):
+        try:
+            self.mock.proxy().cow()
+            self.fail()
+        except pmock.MatchError, err:
+            self.assertUnexpectedCallMsg(err.msg, "cow()",
+                                         ["once cow(...).after('bull call')",
+                                          "once bull(...).label('bull call')"])
+            
+
+class OrderedCallsAcrossMocksTest(testsupport.ErrorMsgAssertsMixin,
+                                  pmock.MockTestCase):
+
+    def setUp(self):
+        pmock.MockTestCase.setUp(self)
+        self.mock1 = pmock.Mock()
+        self.mock2 = pmock.Mock()
+        self.mock1.expect().method("bull").label("bull call")
+        self.mock2.expect().method("cow").after("bull call")
+
+    def test_call_in_order(self):
+        self.mock1.proxy().bull()
+        self.mock2.proxy().cow()
+        self.mock1.verify()
+        self.mock2.verify()
+        
+    def test_call_out_of_order_doesnt_match(self):
+        try:
+            self.mock2.proxy().cow()
+            fail()
+        except pmock.MatchError, err:
+            self.assertUnexpectedCallMsg(err.msg, "cow()",
+                                         ["once cow(...).after('bull call')"])
+
+
+class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
+                                 pmock.MockTestCase):
+
+    def setUp(self):
+        self.mock = pmock.Mock()
+
+    def test_method_name_as_label(self):
+        self.mock.expect().method("bull")
+        self.mock.expect().method("cow").after("bull")
+        self.mock.proxy().bull()
+        self.mock.proxy().cow()
+        self.mock.verify()
+
+    def test_lifo_order_to_calls_to_same_method(self):
+        self.mock.expect().method("cow").will(pmock.return_value("moo"))
+        self.mock.expect().method("cow").will(
+            pmock.return_value("mooo")).after("cow")
+        self.mock.expect().method("cow").will(
+            pmock.return_value("moooo")).after("cow")
+        self.assertEqual(self.mock.proxy().cow(), "moo")
+        self.assertEqual(self.mock.proxy().cow(), "moooo")
+        self.assertEqual(self.mock.proxy().cow(), "mooo")
+
+    def test_after_undefined_label_raises(self):
+        try:
+            self.mock.expect().method("cow").after("ox")
+            fail()
+        except pmock.DefinitionError, err:
+            self.assertUndefinedLabelMsg(err.msg, "ox")
+
+    def test_allow_duplicate_labels(self):
+        self.mock.expect().method("eat").with(pmock.eq("cow")).label("bovine")
+        self.mock.expect().method("eat").with(pmock.eq("bull")).label("bovine")
+        self.mock.expect().method("madness").after("bovine")
+        self.mock.proxy().eat("cow")
+        self.mock.proxy().madness()
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -18,3 +18,6 @@ class ErrorMsgAssertsMixin:
     def assertConflictedCallMsg(self, msg, call_str, conflicted_str):
         self.assertEqual(msg, "call %s, conflicts with expectation: %s" %
                          (call_str, conflicted_str))
+
+    def assertUndefinedLabelMsg(self, msg, label):
+        self.assertEqual(msg, "reference to undefined label: %s" % label)

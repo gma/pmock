@@ -48,6 +48,9 @@ __author__ = "Graham Carlyle"
 __email__ = "grahamcarlyle at users dot sourceforge dot net"
 __version__ = "0.1"
 
+import unittest
+
+
 ##############################################################################
 # Exported classes and functions
 ##############################################################################
@@ -58,7 +61,7 @@ __all__ = []
 # Mock objects framework
 ##############################################################################
 
-class ExpectationError(AssertionError):
+class Error(AssertionError):
 
     def __init__(self, msg):
         AssertionError.__init__(self, msg)
@@ -71,7 +74,7 @@ class ExpectationError(AssertionError):
     _mockers_str = classmethod(_mockers_str)
 
 
-class VerificationError(ExpectationError):
+class VerificationError(Error):
 
     def create_unsatisfied_error(cls, unsatisfied_mockers):
         msg = ("unsatisfied expectation(s): %s" %
@@ -81,7 +84,7 @@ class VerificationError(ExpectationError):
     create_unsatisfied_error = classmethod(create_unsatisfied_error)
 
 
-class MatchError(ExpectationError):
+class MatchError(Error):
 
     def create_conflict_error(cls, call, mocker):
         msg = ("call %s, conflicts with expectation: %s" %
@@ -101,7 +104,17 @@ class MatchError(ExpectationError):
 
     create_unexpected_error = classmethod(create_unexpected_error)
 
-    
+
+class DefinitionError(Error):
+
+    def create_unregistered_label_error(cls, label):
+        msg = ("reference to undefined label: %s" % label)
+        return DefinitionError(msg)
+
+    create_unregistered_label_error = classmethod(
+        create_unregistered_label_error)
+
+
 class AbstractArgumentsMatcher(object):
 
     def __init__(self, arg_constraints=(), kwarg_constraints={}):
@@ -179,18 +192,69 @@ class MethodMatcher(object):
         return call.name == self._name
 
 
-class CallMocker(object):
+class InvocationLog(object):
 
+    singleton = None
+    
+    def __init__(self):
+        self._invocations = {}
+        self._registered = {}
+
+    def clear(self):
+        self._invocations.clear()
+        self._registered.clear()
+
+    def invoked(self, label):
+        self._invocations[label] = True
+
+    def has_been_invoked(self, label):
+        return self._invocations.has_key(label)
+        
+    def register(self, label):
+        self._registered[label] = True
+
+    def is_registered(self, label):
+        return self._registered.has_key(label)
+        
+    def instance(cls):
+        if cls.singleton is None:
+            cls.singleton = InvocationLog()
+        return cls.singleton
+
+    instance = classmethod(instance)
+
+
+class AfterLabelMatcher(object):
+
+    def __init__(self, label, invocation_log):
+        self._invocation_log = invocation_log
+        self._label = label
+        if not invocation_log.is_registered(label):
+            raise DefinitionError.create_unregistered_label_error(label)
+        
+    def __str__(self):
+         return "after(%s)" % repr(self._label)
+
+    def matches(self):
+        return self._invocation_log.has_been_invoked(self._label)
+
+
+class CallMocker(object):
+    
     def __init__(self, call_matcher):
         self._call_matcher = call_matcher
         self._method_matcher = None
         self._arguments_matcher = LeastArgumentsMatcher()
         self._action = is_void()
+        self._label = None
+        self._explicit_label = None
+        self._label_matcher = None
 
     def is_satisfied(self):
         return self._call_matcher.is_satisfied()
 
     def invoke(self):
+        InvocationLog.instance().invoked(self._label)
         self._call_matcher.invoke()
         return self._action.invoke()
     
@@ -199,15 +263,27 @@ class CallMocker(object):
         return self
     
     def matchers_str(self):
-        return "%s %s(%s)" % (self._call_matcher, self._method_matcher,
-                              self._arguments_matcher)
+        suffix = [""]
+        if self._explicit_label:
+            suffix.append("label(%s)" % repr(self._label))
+        if self._label_matcher is not None:
+            suffix.append(str(self._label_matcher))
+        return "%s %s(%s)%s" % (self._call_matcher, self._method_matcher,
+                                self._arguments_matcher, ".".join(suffix))
     
     def matches(self, call):
         return (self._call_matcher.matches() and
                 self._method_matcher.matches(call) and
-                self._arguments_matcher.matches(call))
+                self._arguments_matcher.matches(call) and
+                (self._label_matcher is None or self._label_matcher.matches()))
 
+    def _set_label(self, label, explicit):
+        self._label = label
+        self._explicit_label = explicit
+        InvocationLog.instance().register(label)
+        
     def method(self, name):
+        self._set_label(name, False)
         self._method_matcher = MethodMatcher(name)
         return self
 
@@ -227,6 +303,15 @@ class CallMocker(object):
 
     def no_args(self):
         self._arguments_matcher = AllArgumentsMatcher()
+
+    def label(self, label_str):
+        self._set_label(label_str, True)
+        return self
+
+    def after(self, label):
+        self._label_matcher = AfterLabelMatcher(label,
+                                                InvocationLog.instance())
+        return self
 
 
 class MockCall(object):
@@ -308,6 +393,12 @@ class Mock(object):
         unsatisfied = self._unsatisfied_mockers()
         if len(unsatisfied) > 0:
             raise VerificationError.create_unsatisfied_error(unsatisfied)
+
+
+class MockTestCase(unittest.TestCase):
+
+    def setUp(self):
+        InvocationLog.instance().clear()
 
 
 ##############################################################################
@@ -451,3 +542,4 @@ class functor(object):
 
     def eval(self, arg):
         return self._boolean_functor(arg)
+
