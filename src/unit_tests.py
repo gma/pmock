@@ -144,7 +144,7 @@ class LeastArgumentsMatcherTest(ArgumentsMatcherTestMixin, unittest.TestCase):
         self.assertEqual(str(pmock.LeastArgumentsMatcher()), "...")
 
 
-class CallMockerTest(unittest.TestCase):
+class CallMockerTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
 
     def test_matches(self):
         class MockCallMatcher:
@@ -224,7 +224,7 @@ class CallMockerTest(unittest.TestCase):
                                            pmock.LeastArgumentsMatcher()))
 
     def test_labelled_str(self):
-        pmock.InvocationLog.instance().register("smelly")
+        pmock.InvocationLog.instance().clear()
         mocker = pmock.CallMocker(pmock.OnceCallMatcher())
         mocker.method("skunk").label("smelly")
         self.assertEqual(mocker.matchers_str(),
@@ -234,7 +234,9 @@ class CallMockerTest(unittest.TestCase):
 
     def test_after_str(self):
         invocation_log = pmock.InvocationLog.instance()
-        invocation_log.register("smelly")
+        invocation_log.clear()
+        invocation_log.register("smelly",
+                                pmock.CallMocker(pmock.OnceCallMatcher()))
         mocker = pmock.CallMocker(pmock.OnceCallMatcher())
         mocker.method("skunk").after("smelly")
         self.assertEqual(mocker.matchers_str(),
@@ -253,6 +255,7 @@ class CallMockerTest(unittest.TestCase):
         self.assert_(not mocker2.is_satisfied())
 
     def test_invoking_makes_after_match(self):
+        pmock.InvocationLog.instance().clear()
         mocker1 = pmock.CallMocker(
             pmock.OnceCallMatcher()).method("skunk").label("skunk call")
         mocker2 = pmock.CallMocker(
@@ -260,6 +263,18 @@ class CallMockerTest(unittest.TestCase):
         self.assert_(not mocker2.matches(pmock.MockCall("smell", (), {})))
         mocker1.invoke()
         self.assert_(mocker2.matches(pmock.MockCall("smell", (), {})))
+
+    def test_duplicate_label_raises(self):
+        pmock.InvocationLog.instance().clear()
+        mocker1 = pmock.CallMocker(
+            pmock.OnceCallMatcher()).method("skunk").label("skunk call")
+        try:
+            mocker2 = pmock.CallMocker(
+                pmock.OnceCallMatcher()).method("skunk").label("skunk call")
+            self.fail("creating mocker with duplicate label should raise")
+        except pmock.DefinitionError, err:
+            self.assertDuplicateLabelMsg(err.msg, "skunk call",
+                                         "once skunk(...).label('skunk call')")
 
 
 class MethodMatcherTest(unittest.TestCase):
@@ -288,8 +303,10 @@ class InvocationLogTest(unittest.TestCase):
         self.assert_(not self.invocation_log.is_registered("racoon"))
 
     def test_registered(self):
-        self.invocation_log.register("racoon")
+        mocker = pmock.CallMocker(pmock.OnceCallMatcher())
+        self.invocation_log.register("racoon", mocker)
         self.assert_(self.invocation_log.is_registered("racoon"))
+        self.assertEqual(self.invocation_log.get_registered("racoon"), mocker)
 
     def test_has_not_been_invoked(self):
         self.assert_(not self.invocation_log.has_been_invoked("racoon"))
@@ -299,7 +316,8 @@ class InvocationLogTest(unittest.TestCase):
         self.assert_(self.invocation_log.has_been_invoked("racoon"))
 
     def test_reset(self):
-        self.invocation_log.register("racoon")
+        self.invocation_log.register("racoon",
+                                     pmock.CallMocker(pmock.OnceCallMatcher()))
         self.invocation_log.invoked("racoon")
         self.invocation_log.clear()
         self.assert_(not self.invocation_log.has_been_invoked("racoon"))
@@ -315,7 +333,8 @@ class AfterLabelMatcherTest(testsupport.ErrorMsgAssertsMixin,
 
     def setUp(self):
         self.invocation_log = pmock.InvocationLog()
-        self.invocation_log.register("weasel")
+        mocker = pmock.CallMocker(pmock.OnceCallMatcher())
+        self.invocation_log.register("weasel", mocker)
         self.matcher = pmock.AfterLabelMatcher("weasel", self.invocation_log)
         
     def test_uninvoked_doesnt_match(self):
@@ -466,7 +485,7 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
 
     def test_expect(self):
         mock = pmock.Mock()
-        mock.expect().method("foo")
+        mock.expect(pmock.OnceCallMatcher()).method("foo")
         self.assertRaises(pmock.VerificationError, mock.verify)
 
     def test_stub(self):

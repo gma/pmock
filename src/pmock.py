@@ -114,11 +114,18 @@ class DefinitionError(Error):
     """Expectation definition isn't valid."""
 
     def create_unregistered_label_error(cls, label):
-        msg = ("reference to undefined label: %s" % label)
+        msg = "reference to undefined label: %s" % label
         return DefinitionError(msg)
 
     create_unregistered_label_error = classmethod(
         create_unregistered_label_error)
+
+    def create_duplicate_label_error(cls, label, mocker):
+        msg = ("label: %s is already defined by expectation: %s" %
+               (label, mocker))
+        return DefinitionError(msg)
+
+    create_duplicate_label_error = classmethod(create_duplicate_label_error)
 
 
 class AbstractArgumentsMatcher(object):
@@ -216,11 +223,14 @@ class InvocationLog(object):
     def has_been_invoked(self, label):
         return self._invocations.has_key(label)
         
-    def register(self, label):
-        self._registered[label] = True
+    def register(self, label, mocker):
+        self._registered[label] = mocker
 
     def is_registered(self, label):
         return self._registered.has_key(label)
+
+    def get_registered(self, label):
+        return self._registered[label]
         
     def instance(cls):
         if cls.singleton is None:
@@ -285,9 +295,14 @@ class CallMocker(object):
                 (self._label_matcher is None or self._label_matcher.matches()))
 
     def _set_label(self, label, explicit):
+        invocation_log = InvocationLog.instance()
+        if explicit and invocation_log.is_registered(label):
+            mocker = invocation_log.get_registered(label)
+            raise DefinitionError.create_duplicate_label_error(
+                label, mocker.matchers_str())
         self._label = label
         self._explicit_label = explicit
-        InvocationLog.instance().register(label)
+        invocation_log.register(label, self)
         
     def method(self, name):
         """Define method name."""
@@ -315,6 +330,7 @@ class CallMocker(object):
     def no_args(self):
         """Method takes no arguments."""
         self._arguments_matcher = AllArgumentsMatcher()
+        return self
 
     def label(self, label_str):
         """Define a label for use in other mock's L{after} method."""
@@ -398,7 +414,7 @@ class Mock(object):
     def _add_mocker(self, mocker):
         self._mockers.insert(0, mocker)
         
-    def expect(self, call_matcher=None):
+    def expect(self, call_matcher):
         """Define a method that is expected to be called.
 
         @return: L{CallMocker}
@@ -454,7 +470,6 @@ def return_value(value):
 
     Convenience function for creating a L{ReturnValueAction} instance.
     """
-    
     return ReturnValueAction(value)
 
 

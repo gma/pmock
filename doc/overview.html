@@ -15,6 +15,7 @@
 <li><a href="#CallOrderingExpectations">Call ordering expectations<a/></li>
 <li><a href="#MockBehaviour">Mock behaviour<a/></li>
 <li><a href="#Stubs">Stubs<a/></li>
+<li><a href="#FromImports">From imports<a/></li>
 <li><a href="#FurtherInformation">Further information<a/></li>
 </ul>
 
@@ -120,6 +121,17 @@ Stubs allow behaviours to be specified for methods that we don't care whether th
 
 <pre>
     mock.stub().method("sleep").is_void()
+</pre>
+
+<h2 id="FromImports">From imports</h2>
+
+The test code can be made more concise by importing the pmock classes and functions into the test module.
+
+<pre>
+    from pmock import *
+
+    mock = Mock()
+    mock.expect().method("calulate").with(eq(34), eq(2)).will(return_value(68))
 </pre>
 
 <h2 id="FurtherInformation">Further information</h2>

@@ -1,6 +1,6 @@
 import unittest
 
-import pmock
+from pmock import *
 
 
 class SystemError(Exception):
@@ -31,29 +31,29 @@ class Greeting:
 class GreetingTest(unittest.TestCase):
 
     def setUp(self):
-        self.mock = pmock.Mock()
+        self.mock = Mock()
         self.greeting = Greeting(self.mock.proxy())
 
     def tearDown(self):
         self.mock.verify()
 
     def test_afternoon(self):
-        self.mock.expect().method("time").will(pmock.return_value((12,10)))
+        self.mock.expect(once()).method("time").will(return_value((12,10)))
         self.assertEqual(self.greeting.message(), "Good afternoon")
 
     def test_morning(self):
-        self.mock.expect().method("time").will(pmock.return_value((6,50)))
+        self.mock.expect(once()).method("time").will(return_value((6,50)))
         self.assertEqual(self.greeting.message(), "Good morning")
 
     def test_evening(self):
-        self.mock.expect().method("time").will(pmock.return_value((19,50)))
+        self.mock.expect(once()).method("time").will(return_value((19,50)))
         self.assertEqual(self.greeting.message(), "Good evening")
 
     def test_clock_failure(self):
         err_msg = "bzzz..malfunction"
         err = SystemError(err_msg)
-        self.mock.expect().method("time").will(pmock.throw_exception(err))
-        self.mock.expect().method("log").with(pmock.string_contains(err_msg))
+        self.mock.expect(once()).method("time").will(raise_exception(err))
+        self.mock.expect(once()).method("log").with(string_contains(err_msg))
         self.assertEqual(self.greeting.message(), "Good day")
         
 
