@@ -51,7 +51,7 @@ Calling the mock with unexpected methods causes an exception to be raised.
     gallery.render()
 </pre>
 
-After the test's normal assertions have been made, an assertion on the mocks' expectations is made.
+After the test's normal assertions have been made, an assertion that the mock's expectations have been satisfied should be made.
 
 <pre>
     mock.verify()
@@ -67,7 +67,7 @@ Expectations can be set on the arguments passed to the mock's methods.
     mock.expects(pmock.once()).render(pmock.eq(640), pmock.eq(480))
 </pre>
 
-The arguments to the expectation's mocked method are constraint objects which are evaluated on the actual arguments when a call is made to the mock object. If an argument doesn't satisfy its constraint then an exception is raised.
+The arguments to the expectation's mocked method are constraint objects which are evaluated on the actual arguments when a call is made to the mock object. If an argument doesn't satisfy its constraint then the expectation remains unsatisfied.
 
 <pre>
     mock.expects(pmock.once()).render(brush=pmock.same(print.BIG_BRUSH))
@@ -99,8 +99,6 @@ The order of calls to the mock object can be described with the <code>after</cod
     mock.expects(pmock.once()).invalidate()
     mock.expects(pmock.once()).render().after("invalidate")
 </pre>
-
-If the calls are made out of order then an exception is raised.
 
 <p>An explicit label can be set for an expectation and used in the <code>after</code> method instead of using the method name.
 
@@ -134,7 +132,7 @@ The mocked methods can be provided with simple behaviours using the <code>will</
 Stubs allow behaviours to be specified for methods that can be called any number of times and are not to be included in the mock's verification check.
 
 <pre>
-    mock.stubs(pmock.once()).sleep().will(pmock.return_value(True))
+    mock.stubs().sleep().will(pmock.return_value(True))
 </pre>
 
 <h2 id="FromImports">From imports</h2>
