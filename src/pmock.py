@@ -121,15 +121,15 @@ class InvocationMocker(object):
         self._matchers = []
         self._invocation_matcher = invocation_matcher
         self._matchers.append(invocation_matcher)
-        self._action = None
+        self._stub = None
         self._id = None
 
     def __str__(self):
         strs = ["%s: " % str(self._invocation_matcher)]
         for matcher in self._matchers[1:]:
             strs.append(str(matcher))
-        if self._action is not None:
-            strs.append(", %s" % self._action)
+        if self._stub is not None:
+            strs.append(", %s" % self._stub)
         if self._id is not None:
             strs.append(" [%s]" % self._id)
         return "".join(strs)
@@ -137,14 +137,14 @@ class InvocationMocker(object):
     def add_matcher(self, matcher):
         self._matchers.append(matcher)
 
-    def set_action(self, action):
-        self._action = action
+    def set_stub(self, stub):
+        self._stub = stub
 
     def invoke(self, invocation):
         for matcher in self._matchers:
             matcher.invoked(invocation)
-        if self._action is not None:
-            return self._action.invoke(invocation)
+        if self._stub is not None:
+            return self._stub.invoke(invocation)
 
     def matches(self, invocation):
         for matcher in self._matchers:
@@ -320,9 +320,9 @@ class InvocationMockerBuilder(object):
         self._mocker.add_matcher(NO_ARGS_MATCHER)
         return self
 
-    def will(self, action):
-        """Set action when method is called."""
-        self._mocker.set_action(action)
+    def will(self, stub):
+        """Set stub when method is called."""
+        self._mocker.set_stub(stub)
         return self
 
     def id(self, id_str):
@@ -510,10 +510,10 @@ class MockTestCase(unittest.TestCase):
 
 
 ##############################################################################
-# Mocked method actions
+# Mocked method stubs
 ############################################################################## 
 
-class ReturnValueAction(object):
+class ReturnValueStub(object):
     
     def __init__(self, value):
         self._value = value
@@ -526,14 +526,14 @@ class ReturnValueAction(object):
 
 
 def return_value(value):
-    """Action that returns the supplied value.    
+    """Stub that returns the supplied value.    
 
-    Convenience function for creating a L{ReturnValueAction} instance.
+    Convenience function for creating a L{ReturnValueStub} instance.
     """
-    return ReturnValueAction(value)
+    return ReturnValueStub(value)
 
 
-class RaiseExceptionAction(object):
+class RaiseExceptionStub(object):
 
     def __init__(self, exception):
         self._exception = exception
@@ -546,11 +546,11 @@ class RaiseExceptionAction(object):
 
 
 def raise_exception(exception):
-    """Action that raises the supplied exception.    
+    """Stub that raises the supplied exception.    
 
-    Convenience function for creating a L{RaiseExceptionAction} instance.
+    Convenience function for creating a L{RaiseExceptionStub} instance.
     """
-    return RaiseExceptionAction(exception)
+    return RaiseExceptionStub(exception)
 
 
 ##############################################################################

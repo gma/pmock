@@ -185,15 +185,15 @@ class InvocationMockerTest(unittest.TestCase):
         mocker.matches(invocation)
         self.assertEqual(matcher.matches_invocation, invocation)
 
-    def test_no_action_returns_none(self):
+    def test_no_stub_returns_none(self):
         mocker = pmock.InvocationMocker(self.MockMatcher(True))
         self.assert_(mocker.invoke(pmock.Invocation("duck", (), {})) is None)
 
-    def test_invoke_returns_actions_value(self):
-        class MockAction:
+    def test_invoke_returns_stubs_value(self):
+        class MockStub:
             def invoke(self, invocation): return 'value'
         mocker = pmock.InvocationMocker(self.MockMatcher(True))
-        mocker.set_action(MockAction())
+        mocker.set_stub(MockStub())
         self.assert_(mocker.invoke(pmock.Invocation("duck", (), {})) ==
                      'value')
 
@@ -238,14 +238,14 @@ class InvocationMockerTest(unittest.TestCase):
         class MockMatcher:
             def __init__(self, str_str): self._str = str_str
             def __str__(self): return self._str
-        MockAction = MockMatcher
+        MockStub = MockMatcher
         mocker = pmock.InvocationMocker(MockMatcher("invocation_matcher"))
         mocker.add_matcher(MockMatcher("added_matcher1"))
         mocker.add_matcher(MockMatcher("added_matcher2"))
-        mocker.set_action(MockAction("action"))
+        mocker.set_stub(MockStub("stub"))
         self.assertEqual(str(mocker),
                          "invocation_matcher: added_matcher1added_matcher2, "
-                         "action")
+                         "stub")
 
     def test_no_id_str(self):
         class MockMatcher:
@@ -259,13 +259,13 @@ class InvocationMockerTest(unittest.TestCase):
         class MockMatcher:
             def __init__(self, str_str): self._str = str_str
             def __str__(self): return self._str
-        MockAction = MockMatcher
+        MockStub = MockMatcher
         mocker = pmock.InvocationMocker(MockMatcher("invocation_matcher"))
         mocker.add_matcher(MockMatcher("added_matcher1"))
-        mocker.set_action(MockAction("action"))
+        mocker.set_stub(MockStub("stub"))
         mocker.set_id("quack")
         self.assertEqual(str(mocker),
-                         "invocation_matcher: added_matcher1, action [quack]")
+                         "invocation_matcher: added_matcher1, stub [quack]")
 
 
 class InvocationMockerBuilderTest(testsupport.ErrorMsgAssertsMixin,
@@ -275,13 +275,13 @@ class InvocationMockerBuilderTest(testsupport.ErrorMsgAssertsMixin,
         def __init__(self):
             self.added_matchers = []
             self.id = None
-            self.action = None
+            self.stub = None
         def add_matcher(self, matcher):
             self.added_matchers.append(matcher)
         def set_id(self, mocker_id):
             self.id = mocker_id
-        def set_action(self, action):
-            self.action = action
+        def set_stub(self, stub):
+            self.stub = stub
         def _get_only_added_matcher(self):
             if len(self.added_matchers) != 1:
                 raise AssertionError('more than one matcher has been added')
@@ -347,11 +347,11 @@ class InvocationMockerBuilderTest(testsupport.ErrorMsgAssertsMixin,
         self.assert_(self.builder.any_args() is not None)
         self.assertEqual(self.mocker.added_matcher, pmock.ANY_ARGS_MATCHER)
 
-    def test_set_will_action(self):
-        class MockAction: pass
-        action = MockAction()
-        self.assert_(self.builder.will(action) is not None)
-        self.assertEqual(self.mocker.action, action)
+    def test_set_will_stub(self):
+        class MockStub: pass
+        stub = MockStub()
+        self.assert_(self.builder.will(stub) is not None)
+        self.assertEqual(self.mocker.stub, stub)
 
     def test_set_id(self):
         self.assert_(self.builder.id("poultry") is not None)
@@ -724,37 +724,37 @@ class MockTestCaseTest(unittest.TestCase):
 
 
 ##############################################################################
-# Mocked method actions
+# Mocked method stubs
 ############################################################################## 
 
 class ReturnValueTest(unittest.TestCase):
 
     def setUp(self):
-        self.action = pmock.ReturnValueAction("owl")
+        self.stub = pmock.ReturnValueStub("owl")
         
     def test_invoke(self):
-        self.assertEqual(self.action.invoke(pmock.Invocation("hoot", (), {})),
+        self.assertEqual(self.stub.invoke(pmock.Invocation("hoot", (), {})),
                          "owl")
 
     def test_str(self):
-        self.assertEqual(str(self.action), "returns 'owl'")
+        self.assertEqual(str(self.stub), "returns 'owl'")
 
 
-class RaiseExceptionAction(unittest.TestCase):
+class RaiseExceptionStub(unittest.TestCase):
 
     def setUp(self):
         self.exception = RuntimeError("owl")
-        self.action = pmock.RaiseExceptionAction(self.exception)
+        self.stub = pmock.RaiseExceptionStub(self.exception)
         
     def test_invoke(self):
         try:
-            self.action.invoke(pmock.Invocation("hoot", (), {}))
+            self.stub.invoke(pmock.Invocation("hoot", (), {}))
             self.fail("expected exception to be raised")
         except RuntimeError, err:
             self.assertEqual(err, self.exception)
 
     def test_str(self):
-        self.assertEqual(str(self.action), "raises %s" % self.exception)
+        self.assertEqual(str(self.stub), "raises %s" % self.exception)
 
 
 ##############################################################################
