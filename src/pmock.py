@@ -504,6 +504,9 @@ class MockTestCase(unittest.TestCase):
         setattr(self, self._test_method_name, self._real_test_method)
 
     def mock(self):
+        """Create a mock object that will be automatically verified
+        after the test is run."""
+        
         mock = Mock()
         self._mocks.append(mock)
         return mock
