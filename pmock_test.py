@@ -141,7 +141,7 @@ class MockMethodWithArgsTest(MockTestCase):
                                "pmock.string_contains('slipper'))"])
 
 
-class MockMethodWithArgTestMixin(object):
+class MockMethodWithKeywordArgTestMixin(object):
     
     def test_uncalled_method(self):
         try:
@@ -171,7 +171,8 @@ class MockMethodWithArgTestMixin(object):
                                          ["dog(food=pmock.eq('bone'))"])
 
 
-class MockMethodWithKeywordArgTest(MockMethodWithArgTestMixin, MockTestCase):
+class MockMethodWithKeywordArgTest(MockMethodWithKeywordArgTestMixin,
+                                   MockTestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
@@ -186,7 +187,7 @@ class MockMethodWithKeywordArgTest(MockMethodWithArgTestMixin, MockTestCase):
                                          ["dog(food=pmock.eq('bone'))"])
 
 
-class MockMethodWithAtLeastKeywordArgTest(MockMethodWithArgTestMixin,
+class MockMethodWithAtLeastKeywordArgTest(MockMethodWithKeywordArgTestMixin,
                                           MockTestCase):
 
     def setUp(self):
