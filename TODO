@@ -1,9 +1,8 @@
 todo:
-+ refactor to match jmock apis more closely (Invokable, Matcher, Stub)
++ refactor AfterLabelMatcher to use matcher added to InvocationMocker to determine whether mocker was called
 + default stub behaviour
 + TestCase base class for autoverification of mocks in test case.
-+ change error messages to be more similar to the jmock style (unexpected call -> all mockers with state, failed verification -> verification error)
-+ change to python license
++ change from GPL to python license
 + PyPI registration 
 + constrain allowable order of builder methods
 + add constraints and(), not(), or()

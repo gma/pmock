@@ -44,7 +44,7 @@ it under the terms of the GNU GPL.
 
 __author__ = "Graham Carlyle"
 __email__ = "grahamcarlyle at users dot sourceforge dot net"
-__version__ = "0.2"
+__version__ = "0.3"
 
 
 ##############################################################################
@@ -75,37 +75,27 @@ class Error(AssertionError):
 
 
 class VerificationError(Error):
-    """All the expectations have not been met."""
+    """An expectation have failed verification."""
     
-    def create_unsatisfied_error(cls, unsatisfied_mockers):
-        msg = ("unsatisfied expectation(s): %s" %
-               cls._mockers_str(unsatisfied_mockers))
-        return VerificationError(msg)
+    def create_error(cls, msg, verified_invokable):
+        err_msg = "%s: %s" % (msg, verified_invokable)
+        return VerificationError(err_msg)
 
-    create_unsatisfied_error = classmethod(create_unsatisfied_error)
+    create_error = classmethod(create_error)
 
 
 class MatchError(Error):
-    """Method call unexpected or conflicts with expectations."""
+    """Method call unexpected."""
     
-    def create_conflict_error(cls, invocation, mocker):
-        msg = ("call %s, conflicts with expectation: %s" %
-               (invocation, str(mocker)))
-        return MatchError(msg)
-
-    create_conflict_error = classmethod(create_conflict_error)
-
-    def create_unexpected_error(cls, invocation, unsatisfied_mockers):
-        if len(unsatisfied_mockers) > 0:
-            err_msg = ("unexpected call %s, expectation(s): %s" %
-                       (invocation, cls._mockers_str(unsatisfied_mockers)))
-        else:
-            err_msg = ("unexpected call %s, no expectations remaining" %
-                       invocation)
+    def create_error(cls, msg, invocation, mock):
+        err_msg = "%s\ninvoked %s" % (msg, invocation)
+        invokables_str = mock.invokables_str()
+        if invokables_str != "":
+            err_msg += "\nin:\n" + invokables_str
         return MatchError(err_msg)
 
-    create_unexpected_error = classmethod(create_unexpected_error)
-
+    create_error = classmethod(create_error)
+    
 
 class DefinitionError(Error):
     """Expectation definition isn't valid."""
@@ -118,8 +108,7 @@ class DefinitionError(Error):
         create_unregistered_label_error)
 
     def create_duplicate_label_error(cls, label, mocker):
-        msg = ("label: %s is already defined by expectation: %s" %
-               (label, mocker))
+        msg = ("label: %s is already defined by: %s" % (label, mocker))
         return DefinitionError(msg)
 
     create_duplicate_label_error = classmethod(create_duplicate_label_error)
@@ -233,6 +222,7 @@ class InvocationLog(object):
         return self._registered[label]
 
 
+# TODO refactor to use a matcher to determine if a invoker has been called
 class AfterLabelMatcher(object):
 
     def __init__(self, label, invocation_log, description=None):
@@ -271,7 +261,7 @@ class InvocationMocker(object):
         self._has_been_invoked = False
 
     def __str__(self):
-        strs = ["%s " % str(self._invocation_matcher)]
+        strs = ["%s: " % str(self._invocation_matcher)]
         for matcher in self._matchers[1:]:
             strs.append(str(matcher))
         if self._action is not None:
@@ -285,9 +275,6 @@ class InvocationMocker(object):
 
     def set_action(self, action):
         self._action = action
-
-    def is_satisfied(self):
-        return self._invocation_matcher.is_satisfied()
 
     def invoke(self, invocation):
         self._has_been_invoked = True
@@ -309,8 +296,12 @@ class InvocationMocker(object):
         self._label = label
 
     def verify(self):
-        for matcher in self._matchers:
-            matcher.verify()
+        try:
+            for matcher in self._matchers:
+                matcher.verify()
+        except AssertionError, err:
+            raise VerificationError.create_error(str(err), self)
+
     
 class InvocationMockerBuilder(object):
 
@@ -428,10 +419,6 @@ class Proxy(object):
         return BoundMethod(attr_name, self._mock)
 
 
-class InvokeConflictError(Exception):
-    pass
-
-
 class Mock(object):
     """A mock object."""
 
@@ -447,37 +434,29 @@ class Mock(object):
     def get_name(self):
         return self._name
 
-    # TODO remove satisfaction
-    def _unsatisfied_invokables(self):
-        unsatisfied = []
-        for invokable in self._invokables:
-            if not invokable.is_satisfied():
-                unsatisfied.append(invokable)
-        return unsatisfied
+    def _get_match_order_invokables(self):
+        return self._invokables[::-1] # LIFO
 
-    # TODO replace with a default stub that raises
-    def _unmatched_method_invoked(self, invocation):
-        unsatisfied_invokables = self._unsatisfied_invokables()
-        raise MatchError.create_unexpected_error(invocation,
-                                                 unsatisfied_invokables)
-        
     def invoke(self, invocation):
-        matching_invokable = None
-        for invokable in self._invokables:
-            if invokable.matches(invocation):
-                try:
+        try:
+            matching_invokable = None
+            for invokable in self._get_match_order_invokables():
+                if invokable.matches(invocation):
                     return invokable.invoke(invocation)
-                # TODO replace with exception that falls through
-                except InvokeConflictError:
-                    raise MatchError.create_conflict_error(invocation,
-                                                           invokable)
-        self._unmatched_method_invoked(invocation)
+            # TODO replace with default stub
+            raise AssertionError("no match found")
+        except AssertionError, err:
+            raise MatchError.create_error(str(err), invocation, self)
 
     def add_invokable(self, invokable):
-        self._invokables.insert(0, invokable)
-        
+        self._invokables.append(invokable)
+
+    def invokables_str(self):
+        invokable_strs = [str(invokable) for invokable in self._invokables]
+        return ",\n".join(invokable_strs)
+
     def expects(self, invocation_matcher):
-        """Define a method that is expected to be called.
+        """Define an expectation for a method.
 
         @return: L{InvocationMocker}
         """
@@ -490,7 +469,7 @@ class Mock(object):
 
         @return: L{InvocationMocker}
         """
-        mocker = InvocationMocker(StubInvocationMatcher())
+        mocker = InvocationMocker(_STUB_MATCHER_INSTANCE)
         self.add_invokable(mocker)
         return NameAndDirectArgsBuilder(mocker, self._invocation_log)
 
@@ -502,15 +481,10 @@ class Mock(object):
         """ 
         return self._proxy
     
-    # TODO replace with verification call on the invokables
     def verify(self):
         """Check that the mock object has been called as expected."""
-        for invokable in self._invokables:
+        for invokable in self._get_match_order_invokables():
             invokable.verify()
-            
-        unsatisfied = self._unsatisfied_invokables()
-        if len(unsatisfied) > 0:
-            raise VerificationError.create_unsatisfied_error(unsatisfied)
 
 
 ##############################################################################
@@ -561,28 +535,38 @@ def raise_exception(exception):
 # Invocation matchers
 ############################################################################## 
 
-class AbstractInvocationMatcher(object):
+class InvokedRecorderMatcher(object):
 
     def __init__(self):
         self._invoked = False
 
+    def has_been_invoked(self):
+        return self._invoked
+    
+    def matches(self, invocation):
+        return True
+
     def invoked(self, invocation):
         self._invoked = True
 
-    
-class OnceInvocationMatcher(AbstractInvocationMatcher):
-
-    def __str__(self):
-        return "once"
-    
-    def is_satisfied(self):
-        return self._invoked
-
-    def matches(self, invocation):
-        return not self._invoked
-
     def verify(self):
         pass
+
+    
+class OnceInvocationMatcher(InvokedRecorderMatcher):
+
+    def __str__(self):
+        if self.has_been_invoked():
+            return "expected once and has been invoked"
+        else:
+            return "expected once"
+    
+    def matches(self, invocation):
+        return not self.has_been_invoked()
+
+    def verify(self):
+        if not self.has_been_invoked():
+            raise AssertionError("expected method was not invoked")
 
 
 def once():
@@ -593,19 +577,20 @@ def once():
     return OnceInvocationMatcher()
 
 
-class AtLeastOnceInvocationMatcher(AbstractInvocationMatcher):
+class AtLeastOnceInvocationMatcher(InvokedRecorderMatcher):
 
     def __str__(self):
-        return "at least once"
-
-    def is_satisfied(self):
-        return self._invoked
+        if self.has_been_invoked():
+            return "expected at least once and has been invoked"
+        else:
+            return "expected at least once"
 
     def matches(self, invocation):
         return True
 
     def verify(self):
-        pass
+        if not self.has_been_invoked():
+            raise AssertionError("expected method was not invoked")
 
 
 def at_least_once():
@@ -617,46 +602,48 @@ def at_least_once():
     return AtLeastOnceInvocationMatcher()
 
 
-class NotCalledInvocationMatcher(AbstractInvocationMatcher):
+class NotCalledInvocationMatcher(object):
 
     def __str__(self):
-        return "not called"
+        return "expected not to be called"
 
     def invoked(self, invocation):
-        AbstractInvocationMatcher.invoked(self, invocation)
-        raise InvokeConflictError
+        raise AssertionError("expected method to never be invoked")
 
-    def is_satisfied(self):
-        return not self._invoked
-        
     def matches(self, invocation):
         return True
 
     def verify(self):
         pass
+
+
+_NOT_CALLED_MATCHER_INSTANCE = NotCalledInvocationMatcher()
 
 
 def never():
     """Method will not be called.
 
-    Convenience function for creating a L{NotCalledInvocationMatcher} instance.
+    Convenience function for getting a L{NotCalledInvocationMatcher} instance.
     """
-    return NotCalledInvocationMatcher()
+    return _NOT_CALLED_MATCHER_INSTANCE
 
 
 class StubInvocationMatcher(object):
 
+    def __str__(self):
+        return "stub"
+    
     def invoked(self, invocation):
         pass
 
-    def is_satisfied(self):
-        return True
-        
     def matches(self, invocation):
         return True
 
     def verify(self):
         pass
+
+
+_STUB_MATCHER_INSTANCE = StubInvocationMatcher()
 
 
 ##############################################################################
