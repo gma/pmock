@@ -25,7 +25,7 @@ Usage::
         def test_problematic_activation(self):
             mock = pmock.Mock()
             mock.expects(pmock.once()).activate(pmock.eq('core')).will(
-                pmock.throw_exception(RuntimeError('overheating')))
+                pmock.raise_exception(RuntimeError('overheating')))
             mock.expects(pmock.once()).shutdown()
             PowerStation().start_up(mock)
             mock.verify()
