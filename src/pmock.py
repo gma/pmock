@@ -115,6 +115,54 @@ class DefinitionError(Error):
     create_duplicate_id_error = classmethod(create_duplicate_id_error)
 
 
+class InvocationMocker(object):
+    
+    def __init__(self, invocation_matcher):
+        self._matchers = []
+        self._invocation_matcher = invocation_matcher
+        self._matchers.append(invocation_matcher)
+        self._action = None
+        self._id = None
+
+    def __str__(self):
+        strs = ["%s: " % str(self._invocation_matcher)]
+        for matcher in self._matchers[1:]:
+            strs.append(str(matcher))
+        if self._action is not None:
+            strs.append(", %s" % self._action)
+        if self._id is not None:
+            strs.append(" [%s]" % self._id)
+        return "".join(strs)
+
+    def add_matcher(self, matcher):
+        self._matchers.append(matcher)
+
+    def set_action(self, action):
+        self._action = action
+
+    def invoke(self, invocation):
+        for matcher in self._matchers:
+            matcher.invoked(invocation)
+        if self._action is not None:
+            return self._action.invoke(invocation)
+
+    def matches(self, invocation):
+        for matcher in self._matchers:
+            if not matcher.matches(invocation):
+                return False
+        return True
+
+    def set_id(self, mocker_id):
+        self._id = mocker_id
+
+    def verify(self):
+        try:
+            for matcher in self._matchers:
+                matcher.verify()
+        except AssertionError, err:
+            raise VerificationError.create_error(str(err), self)
+
+
 class AbstractArgumentsMatcher(object):
 
     def __init__(self, arg_constraints=(), kwarg_constraints={}):
@@ -227,54 +275,6 @@ class InvokedAfterMatcher(object):
         pass
 
 
-class InvocationMocker(object):
-    
-    def __init__(self, invocation_matcher):
-        self._matchers = []
-        self._invocation_matcher = invocation_matcher
-        self._matchers.append(invocation_matcher)
-        self._action = None
-        self._id = None
-
-    def __str__(self):
-        strs = ["%s: " % str(self._invocation_matcher)]
-        for matcher in self._matchers[1:]:
-            strs.append(str(matcher))
-        if self._action is not None:
-            strs.append(", %s" % self._action)
-        if self._id is not None:
-            strs.append(" [%s]" % self._id)
-        return "".join(strs)
-
-    def add_matcher(self, matcher):
-        self._matchers.append(matcher)
-
-    def set_action(self, action):
-        self._action = action
-
-    def invoke(self, invocation):
-        for matcher in self._matchers:
-            matcher.invoked(invocation)
-        if self._action is not None:
-            return self._action.invoke(invocation)
-
-    def matches(self, invocation):
-        for matcher in self._matchers:
-            if not matcher.matches(invocation):
-                return False
-        return True
-
-    def set_id(self, mocker_id):
-        self._id = mocker_id
-
-    def verify(self):
-        try:
-            for matcher in self._matchers:
-                matcher.verify()
-        except AssertionError, err:
-            raise VerificationError.create_error(str(err), self)
-
-    
 class InvocationMockerBuilder(object):
 
     def __init__(self, mocker, builder_namespace):
