@@ -5,7 +5,7 @@ framework.
 This module provides support for creating mock objects for use in unit
 testing. The api is modelled on the jmock mock object framework.
 
-Usage:
+Usage::
 
     import pmock
     import unittest
@@ -45,7 +45,7 @@ it under the terms of the GNU GPL.
 
 __author__ = "Graham Carlyle"
 __email__ = "grahamcarlyle at users dot sourceforge dot net"
-__version__ = "0.1"
+__version__ = "0.2"
 
 import unittest
 
