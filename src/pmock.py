@@ -160,7 +160,10 @@ class AbstractArgumentsMatcher(object):
     def invoked(self, invocation):
         pass
 
-    
+    def verify(self):
+        pass
+
+
 class LeastArgumentsMatcher(AbstractArgumentsMatcher):
 
     def __str__(self):
@@ -211,6 +214,9 @@ class MethodMatcher(object):
     def invoked(self, invocation):
         pass
 
+    def verify(self):
+        pass
+
 
 class InvocationLog(object):
 
@@ -248,6 +254,9 @@ class AfterLabelMatcher(object):
         return mocker.has_been_invoked()
 
     def invoked(self, invocation):
+        pass
+
+    def verify(self):
         pass
 
 
@@ -299,7 +308,10 @@ class InvocationMocker(object):
     def set_label(self, label):
         self._label = label
 
-
+    def verify(self):
+        for matcher in self._matchers:
+            matcher.verify()
+    
 class InvocationMockerBuilder(object):
 
     def __init__(self, mocker, invocation_log):
@@ -493,6 +505,9 @@ class Mock(object):
     # TODO replace with verification call on the invokables
     def verify(self):
         """Check that the mock object has been called as expected."""
+        for invokable in self._invokables:
+            invokable.verify()
+            
         unsatisfied = self._unsatisfied_invokables()
         if len(unsatisfied) > 0:
             raise VerificationError.create_unsatisfied_error(unsatisfied)
@@ -566,6 +581,9 @@ class OnceInvocationMatcher(AbstractInvocationMatcher):
     def matches(self, invocation):
         return not self._invoked
 
+    def verify(self):
+        pass
+
 
 def once():
     """Method will be called only once.
@@ -585,6 +603,9 @@ class AtLeastOnceInvocationMatcher(AbstractInvocationMatcher):
 
     def matches(self, invocation):
         return True
+
+    def verify(self):
+        pass
 
 
 def at_least_once():
@@ -611,6 +632,9 @@ class NotCalledInvocationMatcher(AbstractInvocationMatcher):
     def matches(self, invocation):
         return True
 
+    def verify(self):
+        pass
+
 
 def never():
     """Method will not be called.
@@ -630,6 +654,9 @@ class StubInvocationMatcher(object):
         
     def matches(self, invocation):
         return True
+
+    def verify(self):
+        pass
 
 
 ##############################################################################

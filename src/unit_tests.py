@@ -216,6 +216,15 @@ class InvocationMockerTest(testsupport.ErrorMsgAssertsMixin,
         self.assertEqual(matcher1.invoked_invocation, invocation)
         self.assertEqual(matcher2.invoked_invocation, invocation)
 
+    def test_verify(self):
+        class MockInvocationMatcher:
+            def verify(self): self.verified = True
+            def is_satisfied(self): return True
+        matcher = MockInvocationMatcher()
+        mocker = pmock.InvocationMocker(matcher)
+        mocker.verify()
+        self.assert_(matcher.verified)
+        
     def test_satisfaction(self):
         class MockInvocationMatcher:
             def __init__(self, satisfied): self.satisfied = satisfied
@@ -557,8 +566,19 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
         self.assertEqual(invokable3.attempt_number, 1)
         self.assert_(not invokable3.invoked)
 
+    def test_verify(self):
+        class Invokable:
+            def verify(self): self.verified = True
+            def is_satisfied(self): return True
+        invokable = Invokable()
+        mock = pmock.Mock()
+        mock.add_invokable(invokable)
+        mock.verify()
+        self.assert_(invokable.verified)
+        
     def test_unsatisfied_invokable(self):
         class Invokable:
+            def verify(self): pass
             def is_satisfied(self): return False
             def __str__(self): return "unsatisfied"
         mock = pmock.Mock()
@@ -571,6 +591,7 @@ class MockTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
 
     def test_satisfied_invokable(self):
         class Invokable:
+            def verify(self): pass
             def is_satisfied(self): return True
         mock = pmock.Mock()
         mock.add_invokable(Invokable())
