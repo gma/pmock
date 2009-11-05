@@ -80,7 +80,7 @@ class MockMethodWithArgTest(MockMethodArgTestMixin, unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expects(pmock.once()).method("dog").with(pmock.eq("bone"))
+        self.mock.expects(pmock.once()).method("dog").taking(pmock.eq("bone"))
 
     def test_method_with_correct_arg_and_extras(self):
         try:
@@ -93,7 +93,7 @@ class MockMethodWithAtLeastArgTest(MockMethodArgTestMixin, unittest.TestCase):
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expects(pmock.once()).method("dog").with_at_least(
+        self.mock.expects(pmock.once()).method("dog").taking_at_least(
             pmock.eq("bone"))
 
     def test_method_with_correct_arg_and_extras(self):
@@ -106,7 +106,7 @@ class MockMethodWithArgsTest(unittest.TestCase):
     def setUp(self):
         self.mock = pmock.Mock()
         self.toys = ["ball", "stick"]
-        self.mock.expects(pmock.once()).method("dog").with(
+        self.mock.expects(pmock.once()).method("dog").taking(
             pmock.eq("bone"),
             pmock.same(self.toys),
             pmock.string_contains("slipper"))
@@ -156,7 +156,7 @@ class MockMethodWithKeywordArgTest(MockMethodKeywordArgTestMixin,
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expects(pmock.once()).method("dog").with(
+        self.mock.expects(pmock.once()).method("dog").taking(
             food=pmock.eq("bone"))
 
     def test_method_with_correct_arg_and_extra(self):
@@ -171,7 +171,7 @@ class MockMethodWithAtLeastKeywordArgTest(MockMethodKeywordArgTestMixin,
 
     def setUp(self):
         self.mock = pmock.Mock()
-        self.mock.expects(pmock.once()).method("dog").with_at_least(
+        self.mock.expects(pmock.once()).method("dog").taking_at_least(
             food=pmock.eq("bone"))
 
     def test_method_with_correct_arg_and_extra(self):
@@ -271,7 +271,7 @@ class MockMultipleMethodsTest(unittest.TestCase):
     def setUp(self):
         self.mock = pmock.Mock()
         self.mock.expects(pmock.once()).method("cat")
-        self.mock.expects(pmock.once()).method("cat").with(pmock.eq("mouse"))
+        self.mock.expects(pmock.once()).method("cat").taking(pmock.eq("mouse"))
 
     def test_method_lifo_order(self):
          self.mock.proxy().cat("mouse")
@@ -330,7 +330,7 @@ class FifoExpectationTest(unittest.TestCase):
 
     def test_method_fifo_order(self):
         self.mock = pmock.Mock()
-        self.mock.expects(pmock.once()).method("cat").with(pmock.eq("mouse"))
+        self.mock.expects(pmock.once()).method("cat").taking(pmock.eq("mouse"))
         self.mock.expects(pmock.once()).method("cat")
         self.mock.proxy().cat(food="mouse")
         try:
@@ -463,8 +463,8 @@ class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
         self.mock.verify()
 
     def test_method_name_as_id_binds_to_last_matching_expectation(self):
-        self.mock.expects(pmock.once()).method("cow").with(pmock.eq("moo"))
-        self.mock.expects(pmock.once()).method("cow").with(pmock.eq("mooo"))
+        self.mock.expects(pmock.once()).method("cow").taking(pmock.eq("moo"))
+        self.mock.expects(pmock.once()).method("cow").taking(pmock.eq("mooo"))
         self.mock.expects(pmock.once()).method("bull").after("cow")
         self.mock.proxy().cow("mooo")
         self.mock.proxy().bull()
@@ -500,8 +500,8 @@ class StubTest(unittest.TestCase):
     def test_specified_like_expectations(self):
         mock = pmock.Mock()
         mock.stubs().method("fox")
-        mock.stubs().method("fox").with_at_least("sly")
-        mock.stubs().method("fox").with("sly", meal="chicken")
+        mock.stubs().method("fox").taking_at_least("sly")
+        mock.stubs().method("fox").taking("sly", meal="chicken")
         mock.stubs().method("fox").will(pmock.return_value("trot"))
         self.assertEqual(mock.proxy().fox(), "trot")
         mock.fox("sly", meal="chicken")

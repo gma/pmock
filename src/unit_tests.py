@@ -1,3 +1,4 @@
+import sys
 import unittest
 
 import pmock
@@ -105,7 +106,8 @@ class AllArgumentsMatcherTest(ArgumentsMatcherTestMixin, unittest.TestCase):
         args_matcher = pmock.AllArgumentsMatcher()
         self.assert_(args_matcher.matches(pmock.Invocation("snake", (), {})))
         self.assert_(
-            not args_matcher.matches(pmock.Invocation("snake", ("hiss",), {})))
+            not args_matcher.matches(
+                pmock.Invocation("snake", ("hiss",), {})))
         self.assert_(not args_matcher.matches(
             pmock.Invocation("snake", (), {"food": "goat"})))
 
@@ -326,14 +328,14 @@ class InvocationMockerBuilderTest(testsupport.ErrorMsgAssertsMixin,
                          self.builder)
 
     def test_add_with_matcher(self):
-        self.assert_(self.builder.with(pmock.eq("egg")) is not None)
+        self.assert_(self.builder.taking(pmock.eq("egg")) is not None)
         self.assert_(isinstance(self.mocker.added_matcher,
                                 pmock.AllArgumentsMatcher))
         self.assert_(self.mocker.added_matcher.matches(
             pmock.Invocation(None, ("egg",), {})))
 
-    def test_add_with_at_least_matcher(self):
-        self.assert_(self.builder.with_at_least(pmock.eq("egg")) is not None)
+    def test_add_taking_at_least_matcher(self):
+        self.assert_(self.builder.taking_at_least(pmock.eq("egg")) is not None)
         self.assert_(isinstance(self.mocker.added_matcher,
                                 pmock.LeastArgumentsMatcher))
         self.assert_(self.mocker.added_matcher.matches(
@@ -675,10 +677,17 @@ class MockSpecialsTest(unittest.TestCase):
         str(self.mock)
         self.assertInvocation("__str__", (), {})
 
+    def python_specific_unicode_method(self):
+        python_version = sys.version_info[0:2]
+        if python_version == (2, 5):
+            return "__unicode__"
+        else:
+            return "__str__"
+
     def test_unicode(self):
         self.invokable.returnValue = "mock"
         unicode(self.mock)
-        self.assertInvocation("__unicode__", (), {})
+        self.assertInvocation(self.python_specific_unicode_method(), (), {})
 
 
 class RegisterIdTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):

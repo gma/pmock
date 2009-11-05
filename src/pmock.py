@@ -54,11 +54,15 @@ AND THERE IS NO OBLIGATION WHATSOEVER TO PROVIDE MAINTENANCE,
 SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 """
 
+
 __author__ = "Graham Carlyle"
 __email__ = "grahamcarlyle at users dot sourceforge dot net"
-__version__ = "0.3"
+__version__ = "0.4"
 
+
+import sys
 import unittest
+
 
 ##############################################################################
 # Exported classes and functions
@@ -73,6 +77,11 @@ __all__ = ["Mock", "MockTestCase",
 ##############################################################################
 # Mock objects framework
 ##############################################################################
+
+
+def _deprecated(message):
+    print >> sys.stderr, "DEPRECATED: %s" % message
+
 
 class Error(AssertionError):
 
@@ -310,17 +319,21 @@ class InvocationMockerBuilder(object):
         self._builder_namespace.register_method_name(name, self)
         return self
 
-    def with(self, *arg_constraints, **kwarg_constraints):
+    def taking(self, *arg_constraints, **kwarg_constraints):
         """Fully specify the method's arguments."""
         self._mocker.add_matcher(AllArgumentsMatcher(arg_constraints,
                                                      kwarg_constraints))
         return self
 
-    def with_at_least(self, *arg_constraints, **kwarg_constraints):
+    def taking_at_least(self, *arg_constraints, **kwarg_constraints):
         """Specify the method's minimum required arguments."""
         self._mocker.add_matcher(LeastArgumentsMatcher(arg_constraints,
                                                        kwarg_constraints))
         return self
+
+    def with_at_least(self, *arg_constraints, **kwarg_constraints):
+        _deprecated("with_at_least() has been renamed to taking_at_least()")
+        return self.taking_at_least(self, *arg_constraints, **kwarg_constraints)
 
     def any_args(self):
         """Method takes any arguments."""

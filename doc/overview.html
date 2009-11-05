@@ -79,7 +79,7 @@ More flexible argument constraints can be defined using a slightly more verbose 
 
 <pre>
     mock.expects(pmock.once()).method("render") # any arguments allowed
-    mock.expects(pmock.once()).method("render").with_at_least(brush=pmock.same(print.BIG_BRUSH))
+    mock.expects(pmock.once()).method("render").taking_at_least(brush=pmock.same(print.BIG_BRUSH))
 </pre>
 
 
