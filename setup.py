@@ -20,7 +20,7 @@ doclines = __doc__.split("\n")
 
 setup (
     name = "pmock",
-    version = "0.3",
+    version = "0.4",
     maintainer="Graham Carlyle",
     maintainer_email="grahamcarlyle@users.sourceforge.net",
     license="Same terms as Python",
