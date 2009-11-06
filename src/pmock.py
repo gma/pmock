@@ -57,7 +57,7 @@ SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
 __author__ = "Graham Carlyle"
 __email__ = "grahamcarlyle at users dot sourceforge dot net"
-__version__ = "0.4"
+__version__ = "0.4-gma"
 
 
 import sys
