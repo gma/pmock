@@ -206,7 +206,7 @@ class AbstractArgumentsMatcher(object):
         return True
 
     def _matches_kwargs(self, invocation):
-        for kw, constraint in self._kwarg_constraints.iteritems():
+        for kw, constraint in self._kwarg_constraints.items():
             if (not invocation.kwargs.has_key(kw) or
                 not constraint.eval(invocation.kwargs[kw])):
                 return False
@@ -250,7 +250,7 @@ class AllArgumentsMatcher(AbstractArgumentsMatcher):
         return AbstractArgumentsMatcher._matches_args(self, invocation)
 
     def _matches_kwargs(self, invocation):
-        for invocation_kw in invocation.kwargs.iterkeys():
+        for invocation_kw in invocation.kwargs.keys():
             if invocation_kw not in self._kwarg_constraints:
                 return False
         return AbstractArgumentsMatcher._matches_kwargs(self, invocation)
