@@ -207,7 +207,7 @@ class AbstractArgumentsMatcher(object):
 
     def _matches_kwargs(self, invocation):
         for kw, constraint in self._kwarg_constraints.items():
-            if (not invocation.kwargs.has_key(kw) or
+            if (not kw in invocation.kwargs or
                 not constraint.eval(invocation.kwargs[kw])):
                 return False
         return True
@@ -479,7 +479,7 @@ class Mock(SpecialsMock):
         return self._id_table.get(builder_id, None)
 
     def register_unique_id(self, builder_id, builder):
-        if self._id_table.has_key(builder_id):
+        if builder_id in self._id_table:
             raise DefinitionError.create_duplicate_id_error(builder_id)
         self._id_table[builder_id] = builder
 
