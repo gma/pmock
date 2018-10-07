@@ -595,7 +595,7 @@ class MockTest(unittest.TestCase):
         stub = Stub()
         mock = pmock.Mock()
         mock.set_default_stub(stub)
-        self.assertEquals(mock.foo(), "bark")
+        self.assertEqual(mock.foo(), "bark")
         
     def test_get_unnamed(self):
         mock = pmock.Mock()
