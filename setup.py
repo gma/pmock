@@ -8,7 +8,7 @@ classifiers = """\
 Development Status :: 3 - Alpha
 Intended Audience :: Developers
 License :: OSI Approved :: Python Software Foundation License
-Programming Language :: Python
+Programming Language :: Python :: 2 :: Only
 Topic :: Software Development :: Libraries :: Python Modules
 Topic :: Software Development :: Testing
 Operating System :: OS Independent
