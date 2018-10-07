@@ -13,7 +13,7 @@ Usage::
         def start_up(self, reactor):
             try:
                 reactor.activate('core')
-            except Exception, err:
+            except Exception as err:
                 reactor.shutdown()
 
     class PowerStationTestCase(unittest.TestCase):
@@ -180,7 +180,7 @@ class InvocationMocker(object):
         try:
             for matcher in self._matchers:
                 matcher.verify()
-        except AssertionError, err:
+        except AssertionError as err:
             raise VerificationError.create_error(str(err), self)
 
 
@@ -493,7 +493,7 @@ class Mock(SpecialsMock):
                 if invokable.matches(invocation):
                     return invokable.invoke(invocation)
             return self._default_stub.invoke(invocation)
-        except AssertionError, err:
+        except AssertionError as err:
             raise MatchError.create_error(str(err), invocation, self)
 
     def _invoke_special(self, invocation):

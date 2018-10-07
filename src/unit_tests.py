@@ -230,7 +230,7 @@ class InvocationMockerTest(unittest.TestCase):
         try:
             mocker.verify()
             self.fail("expected verify to raise")
-        except pmock.VerificationError, err:
+        except pmock.VerificationError as err:
             self.assert_(matcher1.verified)
             self.assert_(matcher2.verified)
             self.assert_(not matcher3.verified)
@@ -366,7 +366,7 @@ class InvocationMockerBuilderTest(testsupport.ErrorMsgAssertsMixin,
         try:
             self.builder.id("poultry")
             self.fail("mocker with duplicate ids should raise")
-        except pmock.DefinitionError, err:
+        except pmock.DefinitionError as err:
             self.assertDuplicateIdMsg(err.msg, "poultry")
         
     def test_add_after_ordering(self):
@@ -380,7 +380,7 @@ class InvocationMockerBuilderTest(testsupport.ErrorMsgAssertsMixin,
     def test_after_undefined_id(self):
         try:
             self.builder.after("rooster")
-        except pmock.DefinitionError, err:
+        except pmock.DefinitionError as err:
             self.assertUndefinedIdMsg(err.msg, "rooster")
 
     def test_add_after_other_named_mock_ordering(self):
@@ -491,7 +491,7 @@ class MockTest(unittest.TestCase):
         try:
             mock.invoke(pmock.Invocation("wolf", (), {}))
             self.fail("should have raised due to unexpected method call")
-        except pmock.MatchError, err:
+        except pmock.MatchError as err:
             self.assertEqual(err.msg,
                              "no match found\n"
                              "invoked wolf()")
@@ -704,7 +704,7 @@ class RegisterIdTest(testsupport.ErrorMsgAssertsMixin, unittest.TestCase):
     def test_register_duplicate_id(self):
         try:
             self.mock.register_unique_id("howler", self.builder)
-        except pmock.DefinitionError, err:
+        except pmock.DefinitionError as err:
             self.assertDuplicateIdMsg(err.msg, "howler")
 
     def test_lookup_unknown_id(self):
@@ -824,7 +824,7 @@ class RaiseExceptionStub(unittest.TestCase):
         try:
             self.stub.invoke(pmock.Invocation("hoot", (), {}))
             self.fail("expected exception to be raised")
-        except RuntimeError, err:
+        except RuntimeError as err:
             self.assertEqual(err, self.exception)
 
     def test_str(self):
@@ -852,7 +852,7 @@ class OnceInvocationMatcherTest(unittest.TestCase):
         try:
             self.matcher.verify()
             self.fail("expected verify to raise")
-        except AssertionError, err:
+        except AssertionError as err:
             self.assertEqual("expected method was not invoked", str(err))
 
     def test_verify_invoked(self):
@@ -884,7 +884,7 @@ class AtLeastOnceInvocationMatcherTest(unittest.TestCase):
         try:
             self.matcher.verify()
             self.fail("expected verify to raise")
-        except AssertionError, err:
+        except AssertionError as err:
             self.assertEqual("expected method was not invoked", str(err))
 
     def test_verify_invoked(self):
@@ -912,7 +912,7 @@ class NotCalledInvocationMatcherTest(unittest.TestCase):
         try:
             self.matcher.invoked(pmock.Invocation("worm", (), {}))
             self.fail("expected exception to be raised")
-        except AssertionError, err:
+        except AssertionError as err:
             self.assertEqual(str(err), "expected method to never be invoked")
 
     def test_verify_uninvoked(self):

@@ -243,7 +243,7 @@ class MockMethodWillTest(unittest.TestCase):
         try:
             self.mock.proxy().dog()
             self.fail()
-        except RuntimeError, err:
+        except RuntimeError as err:
             self.assert_(err is custom_err)
             self.mock.verify()
 
@@ -475,7 +475,7 @@ class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
         try:
             self.mock.expects(pmock.once()).method("cow").after("ox")
             self.fail()
-        except pmock.DefinitionError, err:
+        except pmock.DefinitionError as err:
             self.assertUndefinedIdMsg(err.msg, "ox")
 
     def test_disallow_duplicate_ids(self):
@@ -483,7 +483,7 @@ class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
         try:
             self.mock.expects(pmock.once()).method("bull").id("bovine")
             self.fail()
-        except pmock.DefinitionError, err:
+        except pmock.DefinitionError as err:
             self.assertDuplicateIdMsg(err.msg, "bovine")
 
     def test_disallow_duplicating_id_of_existing_method(self):
@@ -491,7 +491,7 @@ class OrderedCallsAdditionalTest(testsupport.ErrorMsgAssertsMixin,
         try:
             self.mock.expects(pmock.once()).method("bovine").id("cow")
             self.fail()
-        except pmock.DefinitionError, err:
+        except pmock.DefinitionError as err:
             self.assertDuplicateIdMsg(err.msg, "cow")
 
 
@@ -533,7 +533,7 @@ class ErrorMessageTest(unittest.TestCase):
         mock.expects(pmock.once()).ant()
         try:
             mock.verify()
-        except pmock.VerificationError, err:
+        except pmock.VerificationError as err:
             self.assertEqual(
                 err.msg,
                 "expected method was not invoked: expected once: ant()")
@@ -545,7 +545,7 @@ class ErrorMessageTest(unittest.TestCase):
         mock.termite()
         try:
             mock.ant()
-        except pmock.MatchError, err:
+        except pmock.MatchError as err:
             self.assertEqual(err.msg,
                              "no match found\n"
                              "invoked ant()\n"
@@ -558,7 +558,7 @@ class ErrorMessageTest(unittest.TestCase):
         mock.expects(pmock.never()).cockroach()
         try:
             mock.cockroach()
-        except pmock.MatchError, err:
+        except pmock.MatchError as err:
             self.assertEqual(err.msg,
                              "expected method to never be invoked\n"
                              "invoked cockroach()\n"
