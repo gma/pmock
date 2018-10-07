@@ -427,7 +427,7 @@ class SpecialsMock(object):
     # __getattr__ & __getattribute__ needed for implementation
     __hash__ = _special("__hash__")
     # __init__ & __new__ needed for implementation
-    __nonzero__ = _special("__nonzero__")
+    __bool__ = _special("__bool__")
     __repr__ = _special("__repr__")
     # assume no good reason to mock __setattr__
     __str__ = _special("__str__")

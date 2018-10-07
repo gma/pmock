@@ -665,7 +665,7 @@ class MockSpecialsTest(unittest.TestCase):
     def test_non_zero(self):
         self.invokable.returnValue = True
         bool(self.mock)
-        self.assertInvocation("__nonzero__", (), {})
+        self.assertInvocation("__bool__", (), {})
 
     def test_repr(self):
         self.invokable.returnValue = "mock"
