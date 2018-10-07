@@ -193,8 +193,7 @@ class AbstractArgumentsMatcher(object):
     def _arg_strs(self):
         arg_strs = [str(c) for c in self._arg_constraints]
         keywords = self._kwarg_constraints.keys()
-        keywords.sort()
-        for kw in keywords:
+        for kw in sorted(keywords):
             constraint = self._kwarg_constraints[kw]
             arg_strs.append("%s=%s" % (kw, str(constraint)))
         return arg_strs
@@ -389,8 +388,7 @@ class Invocation(object):
     def __str__(self):
         arg_strs = [repr(arg) for arg in self.args]
         keywords = self.kwargs.keys()
-        keywords.sort()
-        for kw in keywords:
+        for kw in sorted(keywords):
             arg_strs.append("%s=%s" % (kw, repr(self.kwargs[kw])))
         return "%s(%s)" % (self.name, ", ".join(arg_strs))
 
